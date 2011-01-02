@@ -5,6 +5,7 @@ const path = require('path');
 
 const protoDir = path.resolve(__dirname, 'prototype');
 const modsDir = path.resolve(__dirname, 'mods');
+const customDir = path.resolve(__dirname, 'custom');
 const upstreamDirs = ['latest-maps', 'latest-maps-x'].map(x => path.resolve(__dirname, x));
 const adaptedDirs = ['latest-maps-auto', 'latest-maps-auto-x'].map(x => path.resolve(__dirname, x));
 const backportsDirs = ['backports', 'backports-x'].map(x => path.resolve(__dirname, x));
@@ -22,11 +23,12 @@ function getProtoFilePath() {
 module.exports = {
 	protoDir,
 	modsDir,
+	customDir,
 	upstreamDirs,
 	adaptedDirs,
 	backportsDirs,
 	releaseDir,
-	MAP_DESC_STRINGS,
 	LUA_SOURCE,
+	MAP_DESC_STRINGS,
 	PROTO_FILE_PATH: getProtoFilePath(),
 };

@@ -26,6 +26,7 @@ const {
 const {
 	protoDir,
 	modsDir,
+	customDir,
 	upstreamDirs,
 	adaptedDirs,
 	backportsDirs,
@@ -105,11 +106,13 @@ function mergeUpstreamIntoCopies(willOpt) {
 		console.log(`Processing ${path.relative(process.cwd(), portFolder)}...`);
 		copyFileSync(PROTO_FILE_PATH, path.resolve(portFolder, `${folder}.w3x`));
 		const portedMapPathFromUpstream = path.relative(path.resolve(upstreamDir, folder), path.resolve(portFolder, `${folder}.w3x`));
+		const portedMapPathFromCustom = path.relative(customDir, path.resolve(portFolder, `${folder}.w3x`));
 		const isLua = fs.existsSync(path.resolve(upstreamDir, folder, `war3map.lua`));
 		const {main, config, functions, dropItemsTriggers} = parseCode(
 			fs.readFileSync(path.resolve(upstreamDir, folder, isLua ? `war3map.lua` : `war3map.j`), 'utf8'),
 			isLua ? 'lua' : 'jass2'
 		);
+		const upstreamMapInfo = parseWar(InfoLatest, path.resolve(upstreamDir, folder, 'war3map.w3i'));
 
 		// Create strings file
 		const mapMetaTexts = getMapDescStrings(path.resolve(upstreamDir, folder))
@@ -119,20 +122,24 @@ function mergeUpstreamIntoCopies(willOpt) {
 			let num = Number(key);
 			if (num > maxStringIndex) maxStringIndex = num;
 		}
-		for (let i = 0; i < 6; i++) {
+		for (let i = 0; i < upstreamMapInfo.players.length - 6; i++) {
 			/* GHost: WorldEdit supports up to 6 named forces. Hack to support 12 forces. */
 			editedStrings[`${maxStringIndex + i + 1}`] = `Force ${7 + i}`;
 		}
 		for (let i = 0; i < MAP_DESC_STRINGS.length; i++) {
+			const stringId = lookupStringsIndices[i];
 			if (MAP_DESC_STRINGS[i] in mapMetaTexts) {
-				editedStrings[lookupStringsIndices[i]] = mapMetaTexts[MAP_DESC_STRINGS[i]];
+				editedStrings[stringId] = mapMetaTexts[MAP_DESC_STRINGS[i]];
 				if (MAP_DESC_STRINGS[i] === 'author') {
-					editedStrings[lookupStringsIndices[i]] += `, and IceSandslash`;
+					editedStrings[stringId] += `, and IceSandslash`;
 				} else if (MAP_DESC_STRINGS[i] === 'description') {
-					editedStrings[lookupStringsIndices[i]] = editedStrings[lookupStringsIndices[i]].trim() + ` Evergreen edition.`;
+					editedStrings[stringId] = editedStrings[stringId].trim() + ` Evergreen edition.`;
+				} else if (MAP_DESC_STRINGS[i] === 'name') {
+					// For map databases
+					editedStrings[stringId] = editedStrings[stringId].replace(/\s+v\d+(.\d+)?$/, '') + ` Evergreen`;
 				}
 			} else {
-				delete editedStrings[lookupStringsIndices[i]];
+				delete editedStrings[stringId];
 			}
 		}
 		const defaultGHostTeams = /synergy|friends/.test(folder) ? 'Pairs' : (/\b(\d)vs?\1\b/.test(folder) ? 'NvN' : 'FFA');
@@ -140,7 +147,6 @@ function mergeUpstreamIntoCopies(willOpt) {
 		writeWar(outStringsPath, StringsLegacy, editedStrings);
 
 		// Update info
-		const upstreamMapInfo = parseWar(InfoLatest, path.resolve(upstreamDir, folder, 'war3map.w3i'));
 		const mapInfo = deepClone(protoInfo);
 		mapInfo.camera = deepClone(upstreamMapInfo.camera);
 		mapInfo.players = deepClone(upstreamMapInfo.players);
@@ -152,8 +158,8 @@ function mergeUpstreamIntoCopies(willOpt) {
 		mapInfo.forces = deepClone(upstreamMapInfo.forces);
 		const forceNames = protoInfo.forces.map(force => force.name);
 		assert.strictEqual(forceNames.length, 6, `Expected 6 named forces in prototype map.`);
-		for (let i = 0; i < 6; i++) {
-			/* GHost: WorldEdit supports up to 6 named forces. Hack to support 12 forces. */
+		for (let i = 0; i < upstreamMapInfo.players.length - 6; i++) {
+			/* GHostOne: WorldEdit supports up to 6 named forces. Hack to support 12 forces. */
 			forceNames.push(forceNames.at(-1).replace(/\d+$/, match => `${maxStringIndex + i + 1}`.padStart(match.length, '0')));
 		}
 		
@@ -166,7 +172,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 		*/
 		mapInfo.forces.splice(1, mapInfo.forces.length);
 		if (defaultGHostTeams === 'NvN') {
-			/* Forced team-up in GHost default config. */
+			/* Forced team-up in GHostOne default config. */
 			protoForce.players = (1 << (mapInfo.players.length >> 1)) - 1;
 			mapInfo.forces.push(deepClone(protoForce));
 			mapInfo.forces.at(-1).players <<= (mapInfo.players.length >> 1);
@@ -271,7 +277,13 @@ function mergeUpstreamIntoCopies(willOpt) {
 		for (const fileName of asIsUpstreamFiles) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromUpstream, fileName], {cwd: path.resolve(upstreamDir, folder)});
 		}
-		const nameBuffer = Buffer.from(`${mapMetaTexts.name.replace(/ v\d+(.\d+)?$/, '')} ${evergreenVersion}`);
+		const asIsCustomFiles = [
+			`war3mapSkin.txt`,
+		];
+		for (const fileName of asIsCustomFiles) {
+			spawnSync(`MPQEditor`, [`add`, portedMapPathFromCustom, fileName], {cwd: customDir});
+		}
+		const nameBuffer = Buffer.from(`|cff32cd32${mapMetaTexts.name.replace(/ v\d+(.\d+)?$/, '')} ${evergreenVersion}`);
 		const outName = brandMap(folder, evergreenVersion, '');
 		const sanitizedName = outName.replace(/^\((\d+)\)/, '$1_').replace(/\(([\.\d]+)\)\.w3x$/, (match, $1) => '_' + Buffer.from($1).toString('hex') + '.w3x');
 		releaseMapNames.set(sanitizedName, nameBuffer);
