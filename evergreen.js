@@ -11,6 +11,7 @@ const {
 
 	spawnSync,
 	delFolders,
+	logOnce,
 	parseWar, writeWar, isMapFileName,
 	batchExtract, getMapDescStrings,
 	getDate,
@@ -216,7 +217,7 @@ function optimizeMaps() {
 	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
 	for (const fileName of mapNames) {
 		console.log(`Optimizing ${fileName}...`);
-		spawnSync('w2l.exe', ['slk', fileName], {cwd: backportsDir, stdio: 'inherit'});
+		spawnSync('w2l.exe', ['slk', path.resolve(backportsDir, fileName)], {cwd: backportsDir, stdio: 'inherit'});
 		try {
 			fs.renameSync(
 				path.resolve(backportsDir, `${fileName.slice(0, -4)}_slk.w3x`),
@@ -233,7 +234,7 @@ function setDisplayNamesInPlace() {
 	for (const fileName of mapNames) {
 		const outPath = path.resolve(releaseDir, fileName);
 		if (!releaseMapNames.has(fileName)) {
-			console.error(`[Resumed task] Unable to set display name for ${fileName}.`);
+			logOnce(`[Resumed task] Unable to set display name for maps.`);
 			continue;
 		}
 		let rawData = fs.readFileSync(outPath);
@@ -278,6 +279,7 @@ function runUpdate(opts) {
 	}
 	if (opts.installAI) {
 		// Requires AMAI in PATH
+		// In-place = Output is also stored for forceCachedBackports.
 		installAMAIInPlace();
 	}
 	if (opts.optimize) {
@@ -293,9 +295,9 @@ function runUpdate(opts) {
 function main() {
 	runUpdate({
 		getPrototype: true,
-		getSeasonalMaps: false,
-		forceCachedBackports: false,
-		installAI: true,
+		getSeasonalMaps: false, // true
+		forceCachedBackports: false, // false
+		installAI: true, // true
 		optimize: true,
 		deploy: true,
 	});
