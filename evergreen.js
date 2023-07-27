@@ -11,7 +11,7 @@ const {
 
 	spawnSync,
 	delFolders,
-	parseWar, writeWar,
+	parseWar, writeWar, isMapFileName,
 	batchExtract, getMapDescStrings,
 	getDate,
 	brandMap,
@@ -24,7 +24,7 @@ const {
 	upstreamDir,
 	adaptedDir,
 	backportsDir,
-	amaiDir,
+	releaseDir,
 	MAP_DESC_STRINGS,
 	GAME_MAPS_PATH,
 	PROTO_FILE_PATH,
@@ -39,6 +39,8 @@ const {
 	mergeGlobals,
 	mergeInitialization,
 } = require('./generator');
+
+const releaseMapNames = new Map();
 
 function extractProto() {
 	const protoFileName = path.relative(protoDir, PROTO_FILE_PATH);
@@ -187,47 +189,54 @@ function mergeUpstreamIntoCopies() {
 		rawData = Buffer.concat([header, rawData.slice(0x200)]);
 		const outName = brandMap(folder, evergreenVersion);
 		const sanitizedName = outName.replace(/^\((\d+)\)/, '$1_').replace(/\(([\.\d]+)\)\.w3x$/, (match, $1) => '_' + Buffer.from($1).toString('hex') + '.w3x');
-		fs.writeFileSync(path.resolve(portFolder, '..', sanitizedName), rawData);
+		const outPath = path.resolve(portFolder, '..', sanitizedName);
+		releaseMapNames.set(sanitizedName, nameBuffer);
+		fs.writeFileSync(outPath, rawData);
 	}
 }
 
-function addAMAI() {
-	const mapNames = fs.readdirSync(backportsDir).filter(x => x.endsWith(`.w3x`));
+function installAMAIInPlace() {
+	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
 	for (const fileName of mapNames) {
-		const mapFilePath = path.resolve(backportsDir, fileName);
-		spawnSync(`InstallTFTToMap.bat`, [mapFilePath], {cwd: amaiDir, stdio: 'inherit'});
+		const pathFromCwd = path.relative(process.cwd(), path.resolve(backportsDir, fileName));
+		spawnSync(`InstallTFTToMap.bat`, [pathFromCwd], {stdio: 'inherit'});
 	}
 }
 
-function corruptMPQ() {
-	const mapNames = fs.readdirSync(backportsDir).filter(x => x.endsWith(`.w3x`));
+function optimizeMaps() {
+	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
 	for (const fileName of mapNames) {
-		const mapFilePath = path.resolve(backportsDir, fileName);
-
-		const deleteFiles = [
-			`war3map.lua`,
-			//`war3map.mmp`,
-			//`war3map.wct`,
-			`war3map.wtg`, `war3map.w3c`, `war3map.w3s`, `war3map.w3r`,
-			`(listfile)`, `(attributes)`,
-		];
-		for (const deleteName of deleteFiles) {
-			spawnSync(`MPQEditor`, [`delete`, fileName, deleteName], {cwd: backportsDir, stdio: 'inherit'});
+		console.log(`Optimizing ${fileName}...`);
+		spawnSync('w2l.exe', ['slk', fileName], {cwd: backportsDir, stdio: 'inherit'});
+		try {
+			fs.renameSync(
+				path.resolve(backportsDir, `${fileName.slice(0, -4)}_slk.w3x`),
+				path.resolve(releaseDir, fileName),
+			);
+		} catch (err) {
+			if (err.code !== 'ENOENT') throw err;
 		}
+	}
+}
 
-		const emptyFiles = [
-			'(listfile)', '(attributes)',
-		];
-		for (const emptyFile of emptyFiles) {
-			fs.writeFileSync(path.resolve(backportsDir, emptyFile), '');
-			spawnSync(`WinMPQ`, [`add`, mapFilePath, path.resolve(backportsDir, emptyFile), '/'], {cwd: backportsDir, stdio: 'inherit'});
+function setDisplayNamesInPlace() {
+	const mapNames = fs.readdirSync(releaseDir).filter(isMapFileName);
+	for (const fileName of mapNames) {
+		const outPath = path.resolve(releaseDir, fileName);
+		if (!releaseMapNames.has(fileName)) {
+			console.error(`[Resumed task] Unable to set display name for ${fileName}.`);
+			continue;
 		}
-		
-
-		const content = fs.readFileSync(mapFilePath);
-		const badHeader = Buffer.from('CATS');
-		badHeader.copy(content, 0x204, 0, 4);
-		fs.writeFileSync(mapFilePath, content);
+		let rawData = fs.readFileSync(outPath);
+		const startIndex = rawData.indexOf(0) + 4;
+		const endIndex = rawData.indexOf(0, startIndex);
+		const header = Buffer.concat([
+			rawData.slice(0, startIndex),
+			releaseMapNames.get(fileName),
+			rawData.slice(endIndex, 0x200),
+		], 0x200);
+		rawData = Buffer.concat([header, rawData.slice(0x200)]);
+		fs.writeFileSync(outPath, rawData);
 	}
 }
 
@@ -237,14 +246,16 @@ function copyToWorkingWC3() {
 	} catch (err) {
 		if (err.code !== 'EEXIST') throw err;
 	}
-	const mapNames = fs.readdirSync(backportsDir).filter(x => x.endsWith(`.w3x`));
+	const mapNames = fs.readdirSync(releaseDir).filter(isMapFileName);
 	for (const sanitizedFileName of mapNames) {
+		const fromPath = path.resolve(releaseDir, sanitizedFileName);
 		const fileName = sanitizedFileName.replace(/^(\d+)_/, '($1)').replace(/_([a-f0-9]+)\.w3x$/, (match, $1) => '(' + Buffer.from($1, 'hex').toString('utf8') + ').w3x');
 		fs.copyFileSync(
-			path.resolve(backportsDir, sanitizedFileName),
+			fromPath,
 			path.resolve(GAME_MAPS_PATH, fileName),
 		);
 	}
+	console.log(`${mapNames.length} maps deployed to ${GAME_MAPS_PATH}`);
 }
 
 extractProto();
@@ -254,7 +265,10 @@ batchExtract(upstreamDir, 'latest', backportsDir);
 //*/
 //*
 mergeUpstreamIntoCopies();
-addAMAI();
-corruptMPQ();
+//*/
+installAMAIInPlace();
+optimizeMaps();
+setDisplayNamesInPlace();
+//*/
 copyToWorkingWC3();
 //*/

@@ -169,8 +169,12 @@ function writeWar(targetPath, handler, data, modFn) {
 	}
 }
 
+function isMapFileName(fileName) {
+	return fileName.endsWith('.w3x') && !fileName.endsWith('_slk.w3x');
+}
+
 function batchExtract(rootPath, mode = 'latest', rewriteFolder) {
-	const mapFiles = fs.readdirSync(rootPath).filter(filename => filename.endsWith('.w3x'));
+	const mapFiles = fs.readdirSync(rootPath).filter(isMapFileName);
 	if (!mapFiles.length) throw new Error(`No maps found in ${rootPath}`);
 	for (const mapFile of mapFiles) {
 		//console.log(`Extracting ${mapFile}...`);
@@ -284,6 +288,7 @@ module.exports = {
 	float, quote, snake_case,
 	deepClone,
 	parseWar, writeWar,
+	isMapFileName,
 	batchExtract, getMapDescStrings,
 	getDate,
 	brandMap,

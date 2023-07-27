@@ -8,7 +8,7 @@ const modsDir = path.resolve(__dirname, 'mods');
 const upstreamDir = path.resolve(__dirname, 'latest-official');
 const adaptedDir = path.resolve(__dirname, 'latest-autoadapted');
 const backportsDir = path.resolve(__dirname, 'backports');
-const amaiDir = path.resolve(__dirname, '..', 'AMAI');
+const releaseDir = path.resolve(__dirname, 'release');
 const GAME_MAPS_PATH = path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen');
 const LUA_SOURCE = Symbol('lua_source');
 const MAP_DESC_STRINGS = ['name', 'author', 'description', 'recommendedPlayers'];
@@ -26,7 +26,7 @@ module.exports = {
 	upstreamDir,
 	adaptedDir,
 	backportsDir,
-	amaiDir,
+	releaseDir,
 	MAP_DESC_STRINGS,
 	GAME_MAPS_PATH,
 	LUA_SOURCE,
