@@ -277,9 +277,11 @@ function runUpdate(opts) {
 		mergeUpstreamIntoCopies(opts.optimize);
 	}
 	if (opts.installAI) {
+		// Requires AMAI in PATH
 		installAMAIInPlace();
 	}
 	if (opts.optimize) {
+		// Requires w3x2lni in PATH
 		optimizeMaps();
 		setDisplayNamesInPlace();
 	}
