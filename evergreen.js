@@ -247,11 +247,14 @@ function copyToWorkingWC3() {
 	}
 }
 
-//extractProto();
-/*batchExtract(adaptedDir, 'legacy', backportsDir);
+extractProto();
+//*
+batchExtract(adaptedDir, 'legacy', backportsDir);
 batchExtract(upstreamDir, 'latest', backportsDir);
 //*/
-/*mergeUpstreamIntoCopies();
+//*
+mergeUpstreamIntoCopies();
 addAMAI();
 corruptMPQ();
-copyToWorkingWC3();*/
+copyToWorkingWC3();
+//*/
