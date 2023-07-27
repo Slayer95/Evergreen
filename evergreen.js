@@ -67,7 +67,7 @@ function stripProtoJass(jass) {
 	return outputLines.join(`\r\n`);
 }
 
-function mergeUpstreamIntoCopies() {
+function mergeUpstreamIntoCopies(willOpt) {
 	const folderContents = new Set(fs.readdirSync(upstreamDir));
 	const protoInfo = parseWar(InfoLegacy, path.resolve(modsDir, 'war3map.w3i'))
 	const protoStrings = parseWar(StringsLegacy, path.resolve(modsDir, 'war3map.wts'))
@@ -176,22 +176,30 @@ function mergeUpstreamIntoCopies() {
 		for (const fileName of asIsUpstreamFiles) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromUpstream, fileName], {cwd: path.resolve(upstreamDir, folder)});
 		}
-		let rawData = fs.readFileSync(path.resolve(portFolder, `${folder}.w3x`));
-		const startIndex = rawData.indexOf(0) + 4;
-		const endIndex = rawData.indexOf(0, startIndex);
-		rawData[endIndex + 5] = config.playerCount;
 		const nameBuffer = Buffer.from(`${mapMetaTexts.name.replace(/ v\d+(.\d+)?$/, '')} ${evergreenVersion}`);
-		const header = Buffer.concat([
-			rawData.slice(0, startIndex),
-			nameBuffer,
-			rawData.slice(endIndex, 0x200),
-		], 0x200);
-		rawData = Buffer.concat([header, rawData.slice(0x200)]);
 		const outName = brandMap(folder, evergreenVersion);
 		const sanitizedName = outName.replace(/^\((\d+)\)/, '$1_').replace(/\(([\.\d]+)\)\.w3x$/, (match, $1) => '_' + Buffer.from($1).toString('hex') + '.w3x');
-		const outPath = path.resolve(portFolder, '..', sanitizedName);
 		releaseMapNames.set(sanitizedName, nameBuffer);
-		fs.writeFileSync(outPath, rawData);
+
+		if (willOpt) {
+			fs.renameSync(path.resolve(portFolder, `${folder}.w3x`), path.resolve(portFolder, '..', sanitizedName));
+		} else {
+			// Automatically done by w3x2lni
+			let rawData = fs.readFileSync(path.resolve(portFolder, `${folder}.w3x`));
+			const startIndex = rawData.indexOf(0) + 4;
+			const endIndex = rawData.indexOf(0, startIndex);
+			rawData[endIndex + 5] = config.playerCount;
+			const header = Buffer.concat([
+				rawData.slice(0, startIndex),
+				releaseMapNames.get(fileName),
+				rawData.slice(endIndex, 0x200),
+			], 0x200);
+			rawData = Buffer.concat([header, rawData.slice(0x200)]);
+			const outPath = path.resolve(portFolder, '..', sanitizedName);
+			
+			fs.writeFileSync(outPath, rawData);
+			fs.unlinkSync(path.resolve(portFolder, `${folder}.w3x`));
+		}
 	}
 }
 
@@ -204,6 +212,7 @@ function installAMAIInPlace() {
 }
 
 function optimizeMaps() {
+	delFolders([releaseDir]);
 	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
 	for (const fileName of mapNames) {
 		console.log(`Optimizing ${fileName}...`);
@@ -258,17 +267,36 @@ function copyToWorkingWC3() {
 	console.log(`${mapNames.length} maps deployed to ${GAME_MAPS_PATH}`);
 }
 
-extractProto();
-//*
-batchExtract(adaptedDir, 'legacy', backportsDir);
-batchExtract(upstreamDir, 'latest', backportsDir);
-//*/
-//*
-mergeUpstreamIntoCopies();
-//*/
-installAMAIInPlace();
-optimizeMaps();
-setDisplayNamesInPlace();
-//*/
-copyToWorkingWC3();
-//*/
+function runUpdate(opts) {
+	if (opts.getPrototype) extractProto();
+	if (opts.getSeasonalMaps) {
+		batchExtract(adaptedDir, 'legacy', backportsDir);
+		batchExtract(upstreamDir, 'latest', backportsDir);
+	}
+	if (!opts.forceCachedBackports) {
+		mergeUpstreamIntoCopies(opts.optimize);
+	}
+	if (opts.installAI) {
+		installAMAIInPlace();
+	}
+	if (opts.optimize) {
+		optimizeMaps();
+		setDisplayNamesInPlace();
+	}
+	if (opts.deploy) {
+		copyToWorkingWC3();
+	}
+}
+
+function main() {
+	runUpdate({
+		getPrototype: true,
+		getSeasonalMaps: false,
+		forceCachedBackports: false,
+		installAI: true,
+		optimize: true,
+		deploy: true,
+	});
+}
+
+main();
