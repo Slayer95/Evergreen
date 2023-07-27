@@ -4,5 +4,6 @@ latest-official
 latest-autoadapted
 backports
 prototype
+*.slk
 *.w3x
 *.j
