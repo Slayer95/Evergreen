@@ -4,6 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const util = require('util');
 const path = require('path');
+const crypto = require('crypto');
 
 const {
 	InfoLegacy, DoodadsLegacy, UnitsLegacy, StringsLegacy,
@@ -27,7 +28,6 @@ const {
 	backportsDir,
 	releaseDir,
 	MAP_DESC_STRINGS,
-	GAME_MAPS_PATH,
 	PROTO_FILE_PATH,
 } = require('./shared');
 
@@ -212,6 +212,25 @@ function installAMAIInPlace() {
 	}
 }
 
+function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
+	const fromFolder = path.resolve(wc3_data_path, 'Maps', sub_folder_base);
+	const outFolder = path.resolve(wc3_data_path, 'Maps', sub_folder_cmdr);
+	const mapNames = fs.readdirSync(fromFolder).filter(isMapFileName);
+	const tmpNames = new Set();
+	for (const fileName of mapNames) {
+		let tmpName = fileName;
+		do {
+			let hash = crypto.createHash('sha256');
+			hash.update(tmpName);
+			tmpName = `${hash.digest('hex')}.w3x`;
+		} while (tmpNames.has(tmpName));
+		tmpNames.add(tmpName);
+		fs.copyFileSync(path.resolve(fromFolder, fileName), path.resolve(outFolder, tmpName));
+		spawnSync(`InstallCommanderToMap.bat`, [tmpName], {stdio: 'inherit', cwd: outFolder});
+		fs.renameSync(path.resolve(outFolder, tmpName), path.resolve(outFolder, fileName));
+	}
+}
+
 function optimizeMaps() {
 	delFolders([releaseDir]);
 	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
@@ -250,9 +269,10 @@ function setDisplayNamesInPlace() {
 	}
 }
 
-function copyToWorkingWC3() {
+function copyToWorkingWC3(wc3_data_path, sub_folder) {
+	const outFolder = path.resolve(wc3_data_path, 'Maps', sub_folder);
 	try {
-		fs.mkdirSync(path.resolve(GAME_MAPS_PATH));
+		fs.mkdirSync(outFolder);
 	} catch (err) {
 		if (err.code !== 'EEXIST') throw err;
 	}
@@ -262,10 +282,10 @@ function copyToWorkingWC3() {
 		const fileName = sanitizedFileName.replace(/^(\d+)_/, '($1)').replace(/_([a-f0-9]+)\.w3x$/, (match, $1) => '(' + Buffer.from($1, 'hex').toString('utf8') + ').w3x');
 		fs.copyFileSync(
 			fromPath,
-			path.resolve(GAME_MAPS_PATH, fileName),
+			path.resolve(outFolder, fileName),
 		);
 	}
-	console.log(`${mapNames.length} maps deployed to ${GAME_MAPS_PATH}`);
+	console.log(`${mapNames.length} maps deployed to ${outFolder}`);
 }
 
 function runUpdate(opts) {
@@ -289,11 +309,19 @@ function runUpdate(opts) {
 		setDisplayNamesInPlace();
 	}
 	if (opts.deploy) {
-		copyToWorkingWC3();
+		copyToWorkingWC3(opts.wc3_data_path, opts.sub_folder);
 	}
 }
 
-function main() {
+function runAttachCommander() {
+	installAMAICommander(
+		path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
+		'Evergreen',
+		'Evergreen-Cmdr',
+	);
+}
+
+function runMain() {
 	runUpdate({
 		getPrototype: true,
 		getSeasonalMaps: false, // true
@@ -302,7 +330,9 @@ function main() {
 		optimize: false, // true
 		deploy: true,
 		resumable: true,
+		wc3_data_path: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
+		sub_folder: 'Evergreen-Cmdr',
 	});
 }
 
-main();
+runMain();

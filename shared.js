@@ -9,7 +9,6 @@ const upstreamDir = path.resolve(__dirname, 'latest-official');
 const adaptedDir = path.resolve(__dirname, 'latest-autoadapted');
 const backportsDir = path.resolve(__dirname, 'backports');
 const releaseDir = path.resolve(__dirname, 'release');
-const GAME_MAPS_PATH = path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen');
 const LUA_SOURCE = Symbol('lua_source');
 const MAP_DESC_STRINGS = ['name', 'author', 'description', 'recommendedPlayers'];
 
@@ -28,7 +27,6 @@ module.exports = {
 	backportsDir,
 	releaseDir,
 	MAP_DESC_STRINGS,
-	GAME_MAPS_PATH,
 	LUA_SOURCE,
 	PROTO_FILE_PATH: getProtoFilePath(),
 };
