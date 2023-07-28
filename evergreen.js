@@ -68,7 +68,7 @@ function stripProtoJass(jass) {
 	return outputLines.join(`\r\n`);
 }
 
-function mergeUpstreamIntoCopies(willOpt) {
+function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 	const folderContents = new Set(fs.readdirSync(upstreamDir));
 	const protoInfo = parseWar(InfoLegacy, path.resolve(modsDir, 'war3map.w3i'))
 	const protoStrings = parseWar(StringsLegacy, path.resolve(modsDir, 'war3map.wts'))
@@ -182,17 +182,15 @@ function mergeUpstreamIntoCopies(willOpt) {
 		const sanitizedName = outName.replace(/^\((\d+)\)/, '$1_').replace(/\(([\.\d]+)\)\.w3x$/, (match, $1) => '_' + Buffer.from($1).toString('hex') + '.w3x');
 		releaseMapNames.set(sanitizedName, nameBuffer);
 
-		if (willOpt) {
-			fs.renameSync(path.resolve(portFolder, `${folder}.w3x`), path.resolve(portFolder, '..', sanitizedName));
-		} else {
-			// Automatically done by w3x2lni
+		if (ensureResumable || !willOpt) {
 			let rawData = fs.readFileSync(path.resolve(portFolder, `${folder}.w3x`));
 			const startIndex = rawData.indexOf(0) + 4;
 			const endIndex = rawData.indexOf(0, startIndex);
+			// Done out-of-the-box by w3x2lni if willOpt=true
 			rawData[endIndex + 5] = config.playerCount;
 			const header = Buffer.concat([
 				rawData.slice(0, startIndex),
-				releaseMapNames.get(fileName),
+				releaseMapNames.get(sanitizedName),
 				rawData.slice(endIndex, 0x200),
 			], 0x200);
 			rawData = Buffer.concat([header, rawData.slice(0x200)]);
@@ -200,6 +198,8 @@ function mergeUpstreamIntoCopies(willOpt) {
 			
 			fs.writeFileSync(outPath, rawData);
 			fs.unlinkSync(path.resolve(portFolder, `${folder}.w3x`));
+		} else {
+			fs.renameSync(path.resolve(portFolder, `${folder}.w3x`), path.resolve(portFolder, '..', sanitizedName));
 		}
 	}
 }
@@ -275,11 +275,12 @@ function runUpdate(opts) {
 		batchExtract(upstreamDir, 'latest', backportsDir);
 	}
 	if (!opts.forceCachedBackports) {
-		mergeUpstreamIntoCopies(opts.optimize);
+		mergeUpstreamIntoCopies(opts.optimize, opts.resumable);
 	}
 	if (opts.installAI) {
 		// Requires AMAI in PATH
-		// In-place = Output is also stored for forceCachedBackports.
+		// In-place = Output is also stored for future forceCachedBackports.
+		// But explicit installAI overrides cache.
 		installAMAIInPlace();
 	}
 	if (opts.optimize) {
@@ -298,8 +299,9 @@ function main() {
 		getSeasonalMaps: false, // true
 		forceCachedBackports: false, // false
 		installAI: true, // true
-		optimize: true,
+		optimize: false, // true
 		deploy: true,
+		resumable: true,
 	});
 }
 
