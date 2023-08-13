@@ -150,7 +150,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 			`war3map.doo`, `war3mapUnits.doo`,
 		];
 		for (const fileName of editedFiles) {
-			spawnSync(`MPQEditor`, [`add`, `${folder}.w3x`, fileName], {cwd: portFolder});
+			spawnSync(`MPQEditor`, [`add`, `${folder}.w3x`, fileName], {cwd: portFolder, stdio: 'inherit'});
 		}
 		const asIsModFiles = [
 			`war3mapMisc.txt`,
@@ -324,14 +324,14 @@ function runAttachCommander() {
 function runMain() {
 	runUpdate({
 		getPrototype: true,
-		getSeasonalMaps: false, // true
+		getSeasonalMaps: true, // true
 		forceCachedBackports: false, // false
-		installAI: true, // true
+		installAI: false, // true
 		optimize: false, // true
 		deploy: true,
-		resumable: true,
+		resumable: false,
 		wc3_data_path: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
-		sub_folder: 'Evergreen-Cmdr',
+		sub_folder: 'Evergreen',
 	});
 }
 
