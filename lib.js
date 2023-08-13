@@ -173,12 +173,21 @@ function isMapFileName(fileName) {
 	return fileName.endsWith('.w3x') && !fileName.endsWith('_slk.w3x');
 }
 
+function copyFileSync(from, to) {
+	return fs.writeFileSync(to, fs.readFileSync(from));
+}
+
 function batchExtract(rootPath, mode = 'latest', rewriteFolder) {
 	const mapFiles = fs.readdirSync(rootPath).filter(isMapFileName);
 	if (!mapFiles.length) throw new Error(`No maps found in ${rootPath}`);
 	for (const mapFile of mapFiles) {
 		//console.log(`Extracting ${mapFile}...`);
 		const outFolder = mapFile.slice(0, -4);
+		try {
+			fs.mkdirSync(path.resolve(rootPath, outFolder));
+		} catch (err) {
+			if (err.code !== 'EEXIST') throw err;
+		}
 		delFolders([path.resolve(rootPath, outFolder)]);
 		spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: rootPath});
 		const doodadsPath = path.resolve(rootPath, outFolder, 'war3map.doo');
@@ -294,4 +303,5 @@ module.exports = {
 	brandMap,
 
 	exists, replacements, tryReplaceUnit,
+	copyFileSync,
 };

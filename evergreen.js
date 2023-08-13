@@ -18,6 +18,7 @@ const {
 	getDate,
 	brandMap,
 	deepClone,
+	copyFileSync,
 } = require('./lib');
 
 const {
@@ -88,7 +89,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 		}
 		const portedMapPathFromMods = path.relative(modsDir, path.resolve(portFolder, `${folder}.w3x`));
 		console.log(`Processing ${path.relative(process.cwd(), portFolder)}...`);
-		fs.copyFileSync(PROTO_FILE_PATH, path.resolve(portFolder, `${folder}.w3x`));
+		copyFileSync(PROTO_FILE_PATH, path.resolve(portFolder, `${folder}.w3x`));
 		const portedMapPathFromUpstream = path.relative(path.resolve(upstreamDir, folder), path.resolve(portFolder, `${folder}.w3x`));
 		const isLua = fs.existsSync(path.resolve(upstreamDir, folder, `war3map.lua`));
 		const {main, config, functions, dropItemsTriggers} = parseCode(
@@ -150,7 +151,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 			`war3map.doo`, `war3mapUnits.doo`,
 		];
 		for (const fileName of editedFiles) {
-			spawnSync(`MPQEditor`, [`add`, `${folder}.w3x`, fileName], {cwd: portFolder, stdio: 'inherit'});
+			spawnSync(`MPQEditor`, [`add`, `${folder}.w3x`, fileName], {cwd: portFolder});
 		}
 		const asIsModFiles = [
 			`war3mapMisc.txt`,
@@ -198,6 +199,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 			
 			fs.writeFileSync(outPath, rawData);
 			fs.unlinkSync(path.resolve(portFolder, `${folder}.w3x`));
+			fs.writeFileSync(path.resolve(releaseDir, `${folder}.w3x`), rawData);
 		} else {
 			fs.renameSync(path.resolve(portFolder, `${folder}.w3x`), path.resolve(portFolder, '..', sanitizedName));
 		}
@@ -225,7 +227,7 @@ function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
 			tmpName = `${hash.digest('hex')}.w3x`;
 		} while (tmpNames.has(tmpName));
 		tmpNames.add(tmpName);
-		fs.copyFileSync(path.resolve(fromFolder, fileName), path.resolve(outFolder, tmpName));
+		copyFileSync(path.resolve(fromFolder, fileName), path.resolve(outFolder, tmpName));
 		spawnSync(`InstallCommanderToMap.bat`, [tmpName], {stdio: 'inherit', cwd: outFolder});
 		fs.renameSync(path.resolve(outFolder, tmpName), path.resolve(outFolder, fileName));
 	}
@@ -244,12 +246,14 @@ function optimizeMaps() {
 			);
 		} catch (err) {
 			if (err.code !== 'ENOENT') throw err;
+			console.error(err.stack);
 		}
 	}
 }
 
 function setDisplayNamesInPlace() {
 	const mapNames = fs.readdirSync(releaseDir).filter(isMapFileName);
+	console.log(`setDisplayNamesInPlace() - ${mapNames.length} maps found.`);
 	for (const fileName of mapNames) {
 		const outPath = path.resolve(releaseDir, fileName);
 		if (!releaseMapNames.has(fileName)) {
@@ -277,10 +281,11 @@ function copyToWorkingWC3(wc3_data_path, sub_folder) {
 		if (err.code !== 'EEXIST') throw err;
 	}
 	const mapNames = fs.readdirSync(releaseDir).filter(isMapFileName);
+	if (!mapNames.length) return console.error(`No maps generated at ${releaseDir}.`);
 	for (const sanitizedFileName of mapNames) {
 		const fromPath = path.resolve(releaseDir, sanitizedFileName);
 		const fileName = sanitizedFileName.replace(/^(\d+)_/, '($1)').replace(/_([a-f0-9]+)\.w3x$/, (match, $1) => '(' + Buffer.from($1, 'hex').toString('utf8') + ').w3x');
-		fs.copyFileSync(
+		copyFileSync(
 			fromPath,
 			path.resolve(outFolder, fileName),
 		);
@@ -327,7 +332,7 @@ function runMain() {
 		getSeasonalMaps: true, // true
 		forceCachedBackports: false, // false
 		installAI: false, // true
-		optimize: false, // true
+		optimize: true, // true
 		deploy: true,
 		resumable: false,
 		wc3_data_path: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
@@ -336,3 +341,4 @@ function runMain() {
 }
 
 runMain();
+	
