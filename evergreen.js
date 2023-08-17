@@ -331,7 +331,7 @@ function runMain() {
 		getPrototype: true,
 		getSeasonalMaps: true, // true
 		forceCachedBackports: false, // false
-		installAI: false, // true
+		installAI: true, // true
 		optimize: true, // true
 		deploy: true,
 		resumable: false,
@@ -341,4 +341,3 @@ function runMain() {
 }
 
 runMain();
-	

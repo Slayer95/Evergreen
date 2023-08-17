@@ -280,7 +280,7 @@ function delFolders(rootDirs) {
 				rootDirs.push(path.resolve(rootDir, name));
 				allDirs.push(path.resolve(rootDir, name));
 			} else {
-				fs.rmSync(path.resolve(rootDir, name));
+				fs.unlinkSync(path.resolve(rootDir, name));
 			}
 		}
 	}
