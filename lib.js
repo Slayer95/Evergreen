@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const util = require('util');
 const path = require('path');
@@ -23,6 +24,7 @@ const {
 
 const {
 	MAP_DESC_STRINGS,
+	PROTO_FILE_PATH,
 } = require('./shared');
 
 const DataExists = {
@@ -134,6 +136,11 @@ function deepClone(value) {
 	return value;
 }
 
+function execSync(...args) {
+	//console.log(...args);
+	return child_process.execSync(...args);
+}
+
 function spawnSync(...args) {
 	//console.log(...args);
 	return child_process.spawnSync(...args);
@@ -151,6 +158,7 @@ function parseWar(handler, path) {
 }
 
 function writeWar(targetPath, handler, data, modFn) {
+	//console.log(`[writeWar] ${targetPath}`);
 	let result;
 	try {
 		result = handler.jsonToWar(data);
@@ -177,7 +185,8 @@ function copyFileSync(from, to) {
 	return fs.writeFileSync(to, fs.readFileSync(from));
 }
 
-function batchExtract(rootPath, mode = 'latest', rewriteFolder) {
+function batchExtract(rootPath) {
+	//console.log(`[batchExtract] ${rootPath}`);
 	const mapFiles = fs.readdirSync(rootPath).filter(isMapFileName);
 	if (!mapFiles.length) throw new Error(`No maps found in ${rootPath}`);
 	for (const mapFile of mapFiles) {
@@ -190,10 +199,37 @@ function batchExtract(rootPath, mode = 'latest', rewriteFolder) {
 		}
 		delFolders([path.resolve(rootPath, outFolder)]);
 		spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: rootPath});
+	}
+}
+
+function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
+	//console.log(`[batchAdapt-${mode}] ${rootPath}->${rewriteFolder}`);
+	const mapFiles = fs.readdirSync(rootPath).filter(isMapFileName);
+	if (!mapFiles.length) throw new Error(`No maps found in ${rootPath}`);
+	for (const mapFile of mapFiles) {
+		const outFolder = mapFile.slice(0, -4);
 		const doodadsPath = path.resolve(rootPath, outFolder, 'war3map.doo');
 		const unitsPath = path.resolve(rootPath, outFolder, 'war3mapUnits.doo');
-		const doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
-		const units = parseWar(mode === 'legacy' ? UnitsLegacy : UnitsLatest, unitsPath);
+		let doodads;
+		try {
+			doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
+		} catch (err) {
+			console.error(err);
+			const fbPath = path.resolve(rootPath, '..', path.basename(rootPath).replace('-auto', ''), outFolder, 'war3map.doo');
+			console.error(`${doodadsPath} not correctly adapted. Falling back to ${fbPath}...`);
+			/*spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: path.basename(rootPath).replace('-auto', '')});*/
+			doodads = parseWar(DoodadsLatest, fbPath);
+		}
+		let units;
+		try {
+			units = parseWar(mode === 'legacy' ? UnitsLegacy : UnitsLatest, unitsPath);
+		} catch (err) {
+			console.error(err);
+			const fbPath = path.resolve(rootPath, '..', path.basename(rootPath).replace('-auto', ''), outFolder, 'war3mapUnits.doo');
+			console.error(`${unitsPath} not correctly adapted. Falling back to ${fbPath}...`);
+			/*spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: path.basename(rootPath).replace('-auto', '')});*/
+			units = parseWar(UnitsLatest, fbPath);
+		}
 
 
 		for (const doodad of doodads) {
@@ -252,6 +288,33 @@ function getDate() {
 	return date.toString();
 }
 
+function getMapHash(filePath) {
+	const fileContents = fs.readFileSync(filePath);
+	return crypto.createHash('sha256').update(fileContents).digest('hex');
+}
+
+function isCachedProto() {
+	const dirpath = path.dirname(PROTO_FILE_PATH);
+	try {
+		return getMapHash(PROTO_FILE_PATH) === fs.readFileSync(path.resolve(dirpath, 'checksum.txt'), 'utf8');
+	} catch (err) {
+		if (err.code === 'ENOENT') return false;
+		throw err;
+	}
+}
+
+function cacheProtoHash() {
+	const dirpath = path.dirname(PROTO_FILE_PATH);
+	return fs.writeFileSync(path.resolve(dirpath, 'checksum.txt'), getMapHash(PROTO_FILE_PATH));
+}
+
+function getAMAIVersion() {
+	const amaiBinPath = execSync(`where amai`).toString('utf8').trim();
+	const localVersion = execSync(`git rev-parse head`, {cwd: path.dirname(amaiBinPath)}).toString('utf8').trim();
+	const upstreamVersion = execSync(`git rev-parse 2.6.x-zh~1`, {cwd: path.dirname(amaiBinPath)}).toString('utf8').trim();
+	return {private: localVersion, public: upstreamVersion};
+}
+
 function removeVowels(input) {
 	return input.replace(/a|e|i|o|u|[^a-zA-Z0-9\.]/g, '');
 }
@@ -268,9 +331,12 @@ function brandMap(baseName, version) {
 	return baseName + `_${version}${suffix}.w3x`
 }
 
-function delFolders(rootDirs) {
-	for (const rootDir of rootDirs) {
-		assert(!path.relative(process.cwd(), rootDir).startsWith('..'));
+function delFolders(rootDirs, options = {}) {
+	//console.log(`[delFolders] ${rootDirs}`);
+	if (!options.allowOutside) {
+		for (const rootDir of rootDirs) {
+			assert(!path.relative(process.cwd(), rootDir).startsWith('..'));
+		}
 	}
 	const allDirs = [];
 	for (const rootDir of rootDirs) {
@@ -298,9 +364,10 @@ module.exports = {
 	deepClone,
 	logOnce,
 	parseWar, writeWar, isMapFileName,
-	batchExtract, getMapDescStrings,
-	getDate,
+	batchExtract, batchAdapt, getMapDescStrings,
+	getDate, getAMAIVersion,
 	brandMap,
+	getMapHash, isCachedProto, cacheProtoHash,
 
 	exists, replacements, tryReplaceUnit,
 	copyFileSync,

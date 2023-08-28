@@ -14,23 +14,27 @@ const {
 	delFolders,
 	logOnce,
 	parseWar, writeWar, isMapFileName,
-	batchExtract, getMapDescStrings,
-	getDate,
+	batchExtract, batchAdapt, getMapDescStrings,
 	brandMap,
+	getDate,
+	getMapHash, isCachedProto, cacheProtoHash,
 	deepClone,
 	copyFileSync,
+	getAMAIVersion,
 } = require('./lib');
 
 const {
 	protoDir,
 	modsDir,
-	upstreamDir,
-	adaptedDir,
-	backportsDir,
+	upstreamDirs,
+	adaptedDirs,
+	backportsDirs,
 	releaseDir,
 	MAP_DESC_STRINGS,
 	PROTO_FILE_PATH,
 } = require('./shared');
+
+let upstreamDir, adaptedDir, backportsDir;
 
 const {
 	parseCode
@@ -79,8 +83,10 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 	const evergreenDate = getDate();
 	const evergreenGenerator = 'the Evergreen Project';
 	const evergreenVersion = protoStrings[lookupStringsIndices[0]].match(/Evergreen \d+/)?.[0] || `Evergreen 10`;
+	const AMAIVersion = getAMAIVersion();
 	for (const folder of folderContents) {
 		if (!folderContents.has(`${folder}.w3x`)) continue;
+		const hash = getMapHash(path.resolve(upstreamDir, `${folder}.w3x`));
 		const portFolder = path.resolve(backportsDir, folder);
 		try {
 			fs.mkdirSync(portFolder);
@@ -115,11 +121,12 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 		//console.log(`Rewriting ${path.relative(process.cwd(), outJassPath)}...`);
 		let outJassString = protoJass;
 		outJassString = stripProtoJass(outJassString);
-		outJassString = insertMeta(outJassString, mapMetaTexts, {
+		outJassString = insertMeta(outJassString, {hash, texts: mapMetaTexts}, {
 			version: evergreenVersion,
 			author: evergreenAuthor,
 			date: evergreenDate,
 			generator: evergreenGenerator,
+			AMAIVersion: ['2.6.2', AMAIVersion.public, AMAIVersion.private].map(x => x.slice(0, 8)).join(` .. `),
 		});
 		outJassString = mergeGlobals(outJassString, main, config);
 		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
@@ -151,6 +158,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 			`war3map.doo`, `war3mapUnits.doo`,
 		];
 		for (const fileName of editedFiles) {
+			fs.statSync(path.resolve(portFolder, fileName));
 			spawnSync(`MPQEditor`, [`add`, `${folder}.w3x`, fileName], {cwd: portFolder});
 		}
 		const asIsModFiles = [
@@ -158,8 +166,10 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 			`war3map.w3s`,
 			`war3map.w3a`, `war3map.w3h`, `war3map.w3q`, `war3map.w3t`, `war3map.w3u`,
 			/*`war3map.wct`, `war3map.wtg`,*/
+			`war3mapImported`, `UI`,
 		];
 		for (const fileName of asIsModFiles) {
+			fs.statSync(path.resolve(modsDir, fileName));
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromMods, fileName], {cwd: modsDir});
 		}
 		const fromAdaptedFiles = [
@@ -170,7 +180,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromUpstream, fileName], {cwd: path.resolve(adaptedDir, folder)});
 		}
 		if (fromAdaptedFiles.includes(`war3map.w3e`) && !fs.existsSync(path.resolve(adaptedDir, folder, `war3map.w3e`))) {
-			throw new Error(`Place Map Adapter v1.1.6 output at ${adaptedDir}`);
+			throw new Error(`Place Map Adapter v1.1.6 output at ${adaptedDir} (missing for ${folder}.w3x)`);
 		}
 		const asIsUpstreamFiles = [
 			//`war3map.shd`, `war3map.wpm`, `war3map.w3e`,
@@ -228,7 +238,7 @@ function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
 		} while (tmpNames.has(tmpName));
 		tmpNames.add(tmpName);
 		copyFileSync(path.resolve(fromFolder, fileName), path.resolve(outFolder, tmpName));
-		spawnSync(`InstallCommanderToMap.bat`, [tmpName], {stdio: 'inherit', cwd: outFolder});
+		spawnSync(`InstallCommanderToMap.bat`, [tmpName], {/*stdio: 'inherit', */cwd: outFolder});
 		fs.renameSync(path.resolve(outFolder, tmpName), path.resolve(outFolder, fileName));
 	}
 }
@@ -294,17 +304,24 @@ function copyToWorkingWC3(wc3_data_path, sub_folder) {
 }
 
 function runUpdate(opts) {
-	if (opts.getPrototype) extractProto();
-	if (opts.getSeasonalMaps) {
-		batchExtract(adaptedDir, 'legacy', backportsDir);
-		batchExtract(upstreamDir, 'latest', backportsDir);
+	if (opts.extractPrototype) extractProto();
+	if (opts.extractSeasonalMaps) {
+		batchExtract(adaptedDir);
+		batchExtract(upstreamDir);
 	}
-	if (!opts.forceCachedBackports) {
+	if (!opts.useCachedBackports || !isCachedProto()) {
+		delFolders([backportsDir]);
+	}
+	if (opts.adaptSeasonalMaps) {
+		batchAdapt(adaptedDir, 'legacy', backportsDir);
+		batchAdapt(upstreamDir, 'latest', backportsDir);
+	}
+	if (!opts.useCachedBackports) {
 		mergeUpstreamIntoCopies(opts.optimize, opts.resumable);
 	}
 	if (opts.installAI) {
 		// Requires AMAI in PATH
-		// In-place = Output is also stored for future forceCachedBackports.
+		// In-place = Output is also stored for future useCachedBackports.
 		// But explicit installAI overrides cache.
 		installAMAIInPlace();
 	}
@@ -314,8 +331,21 @@ function runUpdate(opts) {
 		setDisplayNamesInPlace();
 	}
 	if (opts.deploy) {
+		if (!isCachedProto() && !opts.nonDestructive) {
+			delFolders([
+				path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen'),
+				path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen-Cmdr'),
+			], {allowOutside: true});
+		}
 		copyToWorkingWC3(opts.wc3_data_path, opts.sub_folder);
 	}
+	cacheProtoHash();
+}
+
+function useMapSet(i) {
+	upstreamDir = upstreamDirs[i];
+	adaptedDir = adaptedDirs[i];
+	backportsDir = backportsDirs[i];
 }
 
 function runAttachCommander() {
@@ -326,18 +356,27 @@ function runAttachCommander() {
 	);
 }
 
-function runMain() {
+function runMain(mapSet) {
+	useMapSet(mapSet);
 	runUpdate({
-		getPrototype: true,
-		getSeasonalMaps: true, // true
-		forceCachedBackports: false, // false
+		extractPrototype: true,
+		extractSeasonalMaps: true, // true
+		adaptSeasonalMaps: true,
+		useCachedBackports: false, // false
 		installAI: true, // true
 		optimize: true, // true
 		deploy: true,
 		resumable: false,
+		nonDestructive: false,
 		wc3_data_path: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
 		sub_folder: 'Evergreen',
 	});
 }
 
-runMain();
+let t = process.hrtime();
+runMain(1);
+runMain(0);
+runAttachCommander();
+t = process.hrtime(t);
+
+console.log(`Done in ${t[0]} seconds.`);

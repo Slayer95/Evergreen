@@ -5,9 +5,9 @@ const path = require('path');
 
 const protoDir = path.resolve(__dirname, 'prototype');
 const modsDir = path.resolve(__dirname, 'mods');
-const upstreamDir = path.resolve(__dirname, 'latest-official');
-const adaptedDir = path.resolve(__dirname, 'latest-autoadapted');
-const backportsDir = path.resolve(__dirname, 'backports');
+const upstreamDirs = ['latest-maps', 'latest-maps-x'].map(x => path.resolve(__dirname, x));
+const adaptedDirs = ['latest-maps-auto', 'latest-maps-auto-x'].map(x => path.resolve(__dirname, x));
+const backportsDirs = ['backports', 'backports-x'].map(x => path.resolve(__dirname, x));
 const releaseDir = path.resolve(__dirname, 'release');
 const LUA_SOURCE = Symbol('lua_source');
 const MAP_DESC_STRINGS = ['name', 'author', 'description', 'recommendedPlayers'];
@@ -22,9 +22,9 @@ function getProtoFilePath() {
 module.exports = {
 	protoDir,
 	modsDir,
-	upstreamDir,
-	adaptedDir,
-	backportsDir,
+	upstreamDirs,
+	adaptedDirs,
+	backportsDirs,
 	releaseDir,
 	MAP_DESC_STRINGS,
 	LUA_SOURCE,
