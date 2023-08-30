@@ -216,7 +216,8 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
 		} catch (err) {
 			console.error(err);
 			const fbPath = path.resolve(rootPath, '..', path.basename(rootPath).replace('-auto', ''), outFolder, 'war3map.doo');
-			console.error(`${doodadsPath} not correctly adapted. Falling back to ${fbPath}...`);
+			console.error(`File not correctly adapted: ${doodadsPath}`);
+			console.error(`Falling back to: ${fbPath}\n`);
 			/*spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: path.basename(rootPath).replace('-auto', '')});*/
 			doodads = parseWar(DoodadsLatest, fbPath);
 		}
@@ -226,7 +227,8 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
 		} catch (err) {
 			console.error(err);
 			const fbPath = path.resolve(rootPath, '..', path.basename(rootPath).replace('-auto', ''), outFolder, 'war3mapUnits.doo');
-			console.error(`${unitsPath} not correctly adapted. Falling back to ${fbPath}...`);
+			console.error(`File not correctly adapted: ${unitsPath}`);
+			console.error(`Falling back to: ${fbPath}\n`);
 			/*spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: path.basename(rootPath).replace('-auto', '')});*/
 			units = parseWar(UnitsLatest, fbPath);
 		}
