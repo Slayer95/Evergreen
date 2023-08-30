@@ -295,7 +295,7 @@ function getMapHash(filePath) {
 	return crypto.createHash('sha256').update(fileContents).digest('hex');
 }
 
-function isCachedProto() {
+function qHasCachedProto() {
 	const dirpath = path.dirname(PROTO_FILE_PATH);
 	try {
 		return getMapHash(PROTO_FILE_PATH) === fs.readFileSync(path.resolve(dirpath, 'checksum.txt'), 'utf8');
@@ -352,9 +352,10 @@ function delFolders(rootDirs, options = {}) {
 			}
 		}
 	}
-	while (allDirs.length) {
+	// Not needed
+	/*while (allDirs.length) {
 		fs.rmdirSync(allDirs.pop());
-	}
+	}*/
 }
 
 module.exports = {
@@ -369,7 +370,7 @@ module.exports = {
 	batchExtract, batchAdapt, getMapDescStrings,
 	getDate, getAMAIVersion,
 	brandMap,
-	getMapHash, isCachedProto, cacheProtoHash,
+	getMapHash, qHasCachedProto, cacheProtoHash,
 
 	exists, replacements, tryReplaceUnit,
 	copyFileSync,

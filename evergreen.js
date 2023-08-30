@@ -17,7 +17,7 @@ const {
 	batchExtract, batchAdapt, getMapDescStrings,
 	brandMap,
 	getDate,
-	getMapHash, isCachedProto, cacheProtoHash,
+	getMapHash, qHasCachedProto, cacheProtoHash,
 	deepClone,
 	copyFileSync,
 	getAMAIVersion,
@@ -304,12 +304,13 @@ function copyToWorkingWC3(wc3_data_path, sub_folder) {
 }
 
 function runUpdate(opts) {
-	if (opts.extractPrototype) extractProto();
+	let hasCachedProto = qHasCachedProto();
+	if (opts.extractPrototype && !hasCachedProto) extractProto();
 	if (opts.extractSeasonalMaps) {
 		batchExtract(adaptedDir);
 		batchExtract(upstreamDir);
 	}
-	if (!opts.useCachedBackports || !isCachedProto()) {
+	if (!opts.useCachedBackports || !hasCachedProto) {
 		delFolders([backportsDir]);
 	}
 	if (opts.adaptSeasonalMaps) {
@@ -331,13 +332,13 @@ function runUpdate(opts) {
 		setDisplayNamesInPlace();
 	}
 	if (opts.deploy) {
-		if (!isCachedProto() && !opts.nonDestructive) {
+		if (!hasCachedProto && opts.deployPath.prune) {
 			delFolders([
 				path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen'),
 				path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen-Cmdr'),
 			], {allowOutside: true});
 		}
-		copyToWorkingWC3(opts.wc3_data_path, opts.sub_folder);
+		copyToWorkingWC3(opts.deployPath.root, opts.deployPath.subFolder);
 	}
 	cacheProtoHash();
 }
@@ -359,17 +360,19 @@ function runAttachCommander() {
 function runMain(mapSet) {
 	useMapSet(mapSet);
 	runUpdate({
-		extractPrototype: true,
+		extractPrototype: true, /* ignored if cached */
 		extractSeasonalMaps: true, // true
 		adaptSeasonalMaps: true,
 		useCachedBackports: false, // false
 		installAI: true, // true
 		optimize: true, // true
 		deploy: true,
+		deployPath: {
+			prune: true,
+			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
+			subFolder: 'Evergreen',
+		},
 		resumable: false,
-		nonDestructive: false,
-		wc3_data_path: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
-		sub_folder: 'Evergreen',
 	});
 }
 
