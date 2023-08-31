@@ -82,7 +82,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 	const evergreenAuthor = 'IceSandslash';
 	const evergreenDate = getDate();
 	const evergreenGenerator = 'the Evergreen Project';
-	const evergreenVersion = protoStrings[lookupStringsIndices[0]].match(/Evergreen \d+/)?.[0] || `Evergreen 10`;
+	const evergreenVersion = protoStrings[lookupStringsIndices[0]].match(/Evergreen \d+/)?.[0] || `Evergreen 20`;
 	const AMAIVersion = getAMAIVersion();
 	for (const folder of folderContents) {
 		if (!folderContents.has(`${folder}.w3x`)) continue;
@@ -334,8 +334,8 @@ function runUpdate(opts) {
 	if (opts.deploy) {
 		if (!hasCachedProto && opts.deployPath.prune) {
 			delFolders([
-				path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen'),
-				path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III', 'Maps', 'Evergreen-Cmdr'),
+				path.resolve(ops.deployPath.root, 'Maps', opts.deployPath.subFolder),
+				path.resolve(ops.deployPath.root, 'Maps', `${opts.deployPath.subFolder}-Cmdr`),
 			], {allowOutside: true});
 		}
 		copyToWorkingWC3(opts.deployPath.root, opts.deployPath.subFolder);
@@ -349,15 +349,15 @@ function useMapSet(i) {
 	backportsDir = backportsDirs[i];
 }
 
-function runAttachCommander() {
+function runAttachCommander(suffix = '') {
 	installAMAICommander(
 		path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
-		'Evergreen',
-		'Evergreen-Cmdr',
+		`Evergreen${suffix}`,
+		`Evergreen-Cmdr${suffix}`',
 	);
 }
 
-function runMain(mapSet) {
+function runMain(mapSet, suffix = '') {
 	useMapSet(mapSet);
 	runUpdate({
 		extractPrototype: true, /* ignored if cached */
@@ -370,16 +370,16 @@ function runMain(mapSet) {
 		deployPath: {
 			prune: true,
 			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
-			subFolder: 'Evergreen',
+			subFolder: `Evergreen${suffix}`,
 		},
 		resumable: false,
 	});
 }
 
 let t = process.hrtime();
-runMain(1);
-runMain(0);
-runAttachCommander();
+runMain(1, '-Next';
+runMain(0, '-Next');
+/*runAttachCommander();*/
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);

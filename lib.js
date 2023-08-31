@@ -342,7 +342,12 @@ function delFolders(rootDirs, options = {}) {
 	}
 	const allDirs = [];
 	for (const rootDir of rootDirs) {
-		const contents = fs.readdirSync(rootDir);
+		let contents;
+		try {
+			contents = fs.readdirSync(rootDir);
+		} catch (err) {
+			if (err.code === 'ENOENT') continue;
+		}
 		for (const name of contents) {
 			if (fs.statSync(path.resolve(rootDir, name)).isDirectory()) {
 				rootDirs.push(path.resolve(rootDir, name));
