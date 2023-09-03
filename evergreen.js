@@ -334,8 +334,8 @@ function runUpdate(opts) {
 	if (opts.deploy) {
 		if (!hasCachedProto && opts.deployPath.prune) {
 			delFolders([
-				path.resolve(ops.deployPath.root, 'Maps', opts.deployPath.subFolder),
-				path.resolve(ops.deployPath.root, 'Maps', `${opts.deployPath.subFolder}-Cmdr`),
+				path.resolve(opts.deployPath.root, 'Maps', opts.deployPath.subFolder),
+				path.resolve(opts.deployPath.root, 'Maps', `${opts.deployPath.subFolder}-Cmdr`),
 			], {allowOutside: true});
 		}
 		copyToWorkingWC3(opts.deployPath.root, opts.deployPath.subFolder);
