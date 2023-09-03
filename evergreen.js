@@ -353,7 +353,7 @@ function runAttachCommander(suffix = '') {
 	installAMAICommander(
 		path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
 		`Evergreen${suffix}`,
-		`Evergreen-Cmdr${suffix}`',
+		`Evergreen-Cmdr${suffix}`,
 	);
 }
 
@@ -377,9 +377,9 @@ function runMain(mapSet, suffix = '') {
 }
 
 let t = process.hrtime();
-runMain(1, '-Next';
-runMain(0, '-Next');
-/*runAttachCommander();*/
+runMain(1, '');
+runMain(0, '');
+runAttachCommander();
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);
