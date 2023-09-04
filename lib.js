@@ -312,8 +312,13 @@ function cacheProtoHash() {
 
 function getAMAIVersion() {
 	const amaiBinPath = execSync(`where amai`).toString('utf8').trim();
-	const localVersion = execSync(`git rev-parse head`, {cwd: path.dirname(amaiBinPath)}).toString('utf8').trim();
-	const upstreamVersion = execSync(`git rev-parse 2.6.x-zh~1`, {cwd: path.dirname(amaiBinPath)}).toString('utf8').trim();
+	const amaiFolder = path.dirname(amaiBinPath);
+	const localVersion = execSync(`git rev-parse head`, {cwd: amaiFolder}).toString('utf8').trim();
+	if (localVersion !== fs.readFileSync(path.resolve(amaiFolder, 'checksum.txt'), 'utf8').trim()) {
+		spawnSync(`MakeOptTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
+		assert.strictEqual(localVersion, fs.readFileSync(path.resolve(amaiFolder, 'checksum.txt'), 'utf8').trim());
+	}
+	const upstreamVersion = execSync(`git rev-parse 2.6.x-zh~1`, {cwd: amaiFolder}).toString('utf8').trim();
 	return {private: localVersion, public: upstreamVersion};
 }
 
