@@ -82,7 +82,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 	const evergreenAuthor = 'IceSandslash';
 	const evergreenDate = getDate();
 	const evergreenGenerator = 'the Evergreen Project';
-	const evergreenVersion = protoStrings[lookupStringsIndices[0]].match(/Evergreen \d+/)?.[0] || `Evergreen 20`;
+	const evergreenVersion = protoStrings[lookupStringsIndices[0]].match(/Evergreen \d+(?:[a-z])?/)?.[0] || `Evergreen 20`;
 	const AMAIVersion = getAMAIVersion();
 	for (const folder of folderContents) {
 		if (!folderContents.has(`${folder}.w3x`)) continue;
