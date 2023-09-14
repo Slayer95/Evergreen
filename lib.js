@@ -82,6 +82,88 @@ function snake_case(text) {
 	return text.toLowerCase().replace(/[^a-z0-9]/g, '_');
 }
 
+function hashStringAsColor(input, isHex) {
+	if (!isHex) {
+		input = crypto.createHash('md5').update(input).digest('hex');
+	}
+	// MIT License (c) Guangcong Luo
+	let H = parseInt(input.substr(4, 4), 16) % 360; // 0 to 360
+	let S = parseInt(input.substr(0, 4), 16) % 50 + 40; // 40 to 89
+	let L = Math.floor(parseInt(input.substr(8, 4), 16) % 20 + 30); // 30 to 49
+
+	const C = (100 - Math.abs(2 * L - 100)) * S / 100 / 100;
+	const X = C * (1 - Math.abs((H / 60) % 2 - 1));
+	const m = L / 100 - C / 2;
+
+	let R1, G1, B1;
+	switch (Math.floor(H / 60)) {
+	case 1: R1 = X; G1 = C; B1 = 0; break;
+	case 2: R1 = 0; G1 = C; B1 = X; break;
+	case 3: R1 = 0; G1 = X; B1 = C; break;
+	case 4: R1 = X; G1 = 0; B1 = C; break;
+	case 5: R1 = C; G1 = 0; B1 = X; break;
+	case 0: default: R1 = C; G1 = X; B1 = 0; break;
+	}
+	const lum = (R1 + m) * 0.2126 + (G1 + m) * 0.7152 + (B1 + m) * 0.0722; // 0.05 (dark blue) to 0.93 (yellow)
+
+	let HLmod = (lum - 0.5) * -100; // -43 (yellow) to 45 (dark blue)
+	if (HLmod > 12) {
+		HLmod -= 12;
+	} else if (HLmod < -10) {
+		HLmod = (HLmod + 10) * 2 / 3;
+	} else {
+		HLmod = 0;
+	}
+
+	L += HLmod;
+
+	let Smod = 10 - Math.abs(50 - L);
+	if (HLmod > 15) Smod += (HLmod - 15) / 2;
+	S -= Smod;
+
+	return [H, S, L]; // 360º, 100%, 100%
+}
+
+function hue2rgb(p, q, t) {
+	if (t < 0) t += 1;
+	if (t > 1) t -= 1;
+	if (t < 1 / 6) return p + (q - p) * 6 * t;
+	if (t < 1 / 2) return q;
+	if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+	return p;
+}
+
+function hslToRgb(h, s, l) { // input normalized to 1
+	let RGB = [];
+	if (s === 0) {
+		RGB = [l, l, l];
+	} else {
+		const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+		const p = 2 * l - q;
+		for (let i = 0; i < 3; i++) {
+			RGB[i] = hue2rgb(p, q, h + (1 - i) / 3);
+		}
+	}
+
+	return RGB.map(num => Math.round(num * 255).toString(16).padStart(2, '0').toUpperCase());
+}
+
+function coloredString(input, isHex) {
+	const hslValues = hashStringAsColor(input, isHex);
+	const hexCode = 'ff' + hslToRgb(hslValues[0] / 360, hslValues[1] / 100, hslValues[2] / 100).join('');
+	return `|c${hexCode}${input}|r`;
+}
+
+function coloredShortHash(input) {
+	const hslValues = hashStringAsColor(input, true);
+	const hexCode = 'ff' + hslToRgb(hslValues[0] / 360, hslValues[1] / 100, hslValues[2] / 100).join('');
+	return `|c${hexCode}${input.slice(0, 8)}|r`;
+}
+
+function coloredHash(input) {
+	return coloredString(input, true);
+}
+
 function exists(type, code) {
 	switch (type) {
 	case 'doodad': return DataExists.Doodads.has(code);
@@ -318,7 +400,7 @@ function getAMAIVersion() {
 		spawnSync(`MakeOptTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
 		assert.strictEqual(localVersion, fs.readFileSync(path.resolve(amaiFolder, 'checksum.txt'), 'utf8').trim());
 	}
-	const upstreamVersion = execSync(`git rev-parse 2.6.x-zh~1`, {cwd: amaiFolder}).toString('utf8').trim();
+	const upstreamVersion = execSync(`git rev-parse 2.6.x-zh~3`, {cwd: amaiFolder}).toString('utf8').trim();
 	return {private: localVersion, public: upstreamVersion};
 }
 
@@ -379,7 +461,7 @@ module.exports = {
 	parseWar, writeWar, isMapFileName,
 	batchExtract, batchAdapt, getMapDescStrings,
 	getDate, getAMAIVersion,
-	brandMap,
+	brandMap, coloredHash, coloredShortHash, coloredString,
 	getMapHash, qHasCachedProto, cacheProtoHash,
 
 	exists, replacements, tryReplaceUnit,

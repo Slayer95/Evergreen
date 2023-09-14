@@ -15,7 +15,7 @@ const {
 	logOnce,
 	parseWar, writeWar, isMapFileName,
 	batchExtract, batchAdapt, getMapDescStrings,
-	brandMap,
+	brandMap, coloredShortHash,
 	getDate,
 	getMapHash, qHasCachedProto, cacheProtoHash,
 	deepClone,
@@ -73,7 +73,7 @@ function stripProtoJass(jass) {
 	return outputLines.join(`\r\n`);
 }
 
-function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
+function mergeUpstreamIntoCopies(willOpt) {
 	const folderContents = new Set(fs.readdirSync(upstreamDir));
 	const protoInfo = parseWar(InfoLegacy, path.resolve(modsDir, 'war3map.w3i'))
 	const protoStrings = parseWar(StringsLegacy, path.resolve(modsDir, 'war3map.wts'))
@@ -116,22 +116,6 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 		const outStringsPath = path.resolve(portFolder, 'war3map.wts');
 		writeWar(outStringsPath, StringsLegacy, editedStrings);
 
-		// Update jass
-		const outJassPath = path.resolve(portFolder, 'war3map.j');
-		//console.log(`Rewriting ${path.relative(process.cwd(), outJassPath)}...`);
-		let outJassString = protoJass;
-		outJassString = stripProtoJass(outJassString);
-		outJassString = insertMeta(outJassString, {hash, texts: mapMetaTexts}, {
-			version: evergreenVersion,
-			author: evergreenAuthor,
-			date: evergreenDate,
-			generator: evergreenGenerator,
-			AMAIVersion: ['2.6.2', AMAIVersion.public, AMAIVersion.private].map(x => x.slice(0, 8)).join(` .. `),
-		});
-		outJassString = mergeGlobals(outJassString, main, config);
-		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
-		fs.writeFileSync(outJassPath, outJassString);
-
 		// Update info
 		const upstreamMapInfo = parseWar(InfoLatest, path.resolve(upstreamDir, folder, 'war3map.w3i'));
 		const mapInfo = deepClone(protoInfo);
@@ -152,7 +136,24 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 		}
 		mapInfo.globalWeather = upstreamMapInfo.globalWeather;
 		const outInfoPath = path.resolve(portFolder, 'war3map.w3i');
-		writeWar(outInfoPath, InfoLegacy, mapInfo, buffer => buffer[0x81] = 2); // Game Data Set = Latest Patch
+		writeWar(outInfoPath, InfoLegacy, mapInfo, buffer => buffer[0x81] = 2); // Game Data Set = 2 (Latest Patch)
+
+		// Update jass
+		const outJassPath = path.resolve(portFolder, 'war3map.j');
+		//console.log(`Rewriting ${path.relative(process.cwd(), outJassPath)}...`);
+		let outJassString = protoJass;
+		outJassString = stripProtoJass(outJassString);
+		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts}, {
+			version: evergreenVersion,
+			author: evergreenAuthor,
+			date: evergreenDate,
+			generator: evergreenGenerator,
+			AMAIVersion: ['|cffffcc002.6.2|r', ...[AMAIVersion.public, AMAIVersion.private].map(coloredShortHash)].join(` .. `),
+		});
+		outJassString = mergeGlobals(outJassString, main, config);
+		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
+		fs.writeFileSync(outJassPath, outJassString);
+
 		const editedFiles = [
 			`war3map.j`, `war3map.wts`, `war3map.w3i`,
 			`war3map.doo`, `war3mapUnits.doo`,
@@ -193,7 +194,7 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 		const sanitizedName = outName.replace(/^\((\d+)\)/, '$1_').replace(/\(([\.\d]+)\)\.w3x$/, (match, $1) => '_' + Buffer.from($1).toString('hex') + '.w3x');
 		releaseMapNames.set(sanitizedName, nameBuffer);
 
-		if (ensureResumable || !willOpt) {
+		if (!willOpt) {
 			let rawData = fs.readFileSync(path.resolve(portFolder, `${folder}.w3x`));
 			const startIndex = rawData.indexOf(0) + 4;
 			const endIndex = rawData.indexOf(0, startIndex);
@@ -216,10 +217,10 @@ function mergeUpstreamIntoCopies(willOpt, ensureResumable) {
 	}
 }
 
-function installAMAIInPlace() {
-	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
+function installAMAIInPlace(dirPath) {
+	const mapNames = fs.readdirSync(dirPath).filter(isMapFileName);
 	for (const fileName of mapNames) {
-		const pathFromCwd = path.relative(process.cwd(), path.resolve(backportsDir, fileName));
+		const pathFromCwd = path.relative(process.cwd(), path.resolve(dirPath, fileName));
 		spawnSync(`InstallTFTToMap.bat`, [pathFromCwd], {stdio: 'inherit'});
 	}
 }
@@ -229,6 +230,11 @@ function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
 	const outFolder = path.resolve(wc3_data_path, 'Maps', sub_folder_cmdr);
 	const mapNames = fs.readdirSync(fromFolder).filter(isMapFileName);
 	const tmpNames = new Set();
+	try {
+		fs.mkdirSync(outFolder);
+	} catch (err) {
+		if (err.code !== 'EEXIST') throw err;
+	}
 	for (const fileName of mapNames) {
 		let tmpName = fileName;
 		do {
@@ -244,7 +250,6 @@ function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
 }
 
 function optimizeMaps() {
-	delFolders([releaseDir]);
 	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
 	for (const fileName of mapNames) {
 		console.log(`Optimizing ${fileName}...`);
@@ -303,28 +308,53 @@ function copyToWorkingWC3(wc3_data_path, sub_folder) {
 	console.log(`${mapNames.length} maps deployed to ${outFolder}`);
 }
 
+function updateMapHashes(wc3_data_path, sub_folder) {
+	const outFolder = path.resolve(wc3_data_path, 'Maps', sub_folder);
+	try {
+		fs.mkdirSync(outFolder);
+	} catch (err) {
+		if (err.code !== 'EEXIST') throw err;
+	}
+	const mapNames = fs.readdirSync(outFolder).filter(isMapFileName);
+	if (!mapNames.length) return console.error(`No maps generated at ${outFolder}.`);
+	const hashes = new Map();
+	for (const fileName of mapNames) {
+		hashes.set(fileName, getMapHash(path.resolve(outFolder, fileName)));
+	}
+	const hashList = Array.from(hashes).map(tuple => tuple.join(','));
+	hashList.unshift('Map,SHA256');
+	hashList.push('');
+	fs.writeFileSync(path.resolve(outFolder, 'hashes.csv'), hashList.join('\n'));
+}
+
 function runUpdate(opts) {
 	let hasCachedProto = qHasCachedProto();
 	if (opts.extractPrototype && !hasCachedProto) extractProto();
 	if (opts.extractSeasonalMaps) {
+		// TODO: This extraction can be cached, but gotta ensure that no new maps have been added.
 		batchExtract(adaptedDir);
 		batchExtract(upstreamDir);
 	}
-	if (!opts.useCachedBackports || !hasCachedProto) {
+
+	let useReleased = opts.useCachedBackports && hasCachedProto;
+	if (!useReleased) {
 		delFolders([backportsDir]);
+		if (opts.adaptSeasonalMaps) {
+			batchAdapt(adaptedDir, 'legacy', backportsDir);
+			batchAdapt(upstreamDir, 'latest', backportsDir);
+		}
 	}
-	if (opts.adaptSeasonalMaps) {
-		batchAdapt(adaptedDir, 'legacy', backportsDir);
-		batchAdapt(upstreamDir, 'latest', backportsDir);
-	}
-	if (!opts.useCachedBackports) {
-		mergeUpstreamIntoCopies(opts.optimize, opts.resumable);
+	if (!useReleased) {
+		delFolders([releaseDir]);
+		mergeUpstreamIntoCopies(opts.optimize);
+		// If optimize is false, mergeUpstreamIntoCopies writes directly to releaseDir
+		useReleased = !opts.optimize;
 	}
 	if (opts.installAI) {
 		// Requires AMAI in PATH
 		// In-place = Output is also stored for future useCachedBackports.
 		// But explicit installAI overrides cache.
-		installAMAIInPlace();
+		installAMAIInPlace(useReleased ? releaseDir : backportsDir);
 	}
 	if (opts.optimize) {
 		// Requires w3x2lni in PATH
@@ -339,6 +369,7 @@ function runUpdate(opts) {
 			], {allowOutside: true});
 		}
 		copyToWorkingWC3(opts.deployPath.root, opts.deployPath.subFolder);
+		updateMapHashes(opts.deployPath.root, opts.deployPath.subFolder);
 	}
 	cacheProtoHash();
 }
@@ -350,11 +381,9 @@ function useMapSet(i) {
 }
 
 function runAttachCommander(suffix = '') {
-	installAMAICommander(
-		path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
-		`Evergreen${suffix}`,
-		`Evergreen-Cmdr${suffix}`,
-	);
+	const deployRoot = path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III');
+	installAMAICommander(deployRoot, `Evergreen${suffix}`, `Evergreen-Cmdr${suffix}`);
+	updateMapHashes(deployRoot, `Evergreen-Cmdr${suffix}`);
 }
 
 function runMain(mapSet, suffix = '') {
@@ -362,7 +391,7 @@ function runMain(mapSet, suffix = '') {
 	runUpdate({
 		extractPrototype: true, /* ignored if cached */
 		extractSeasonalMaps: true, // true
-		adaptSeasonalMaps: true,
+		adaptSeasonalMaps: true, /* ignored if cached */
 		useCachedBackports: false, // false
 		installAI: true, // true
 		optimize: true, // true
@@ -372,14 +401,13 @@ function runMain(mapSet, suffix = '') {
 			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
 			subFolder: `Evergreen${suffix}`,
 		},
-		resumable: false,
 	});
 }
 
 let t = process.hrtime();
-runMain(1, '');
-runMain(0, '');
-runAttachCommander();
+runMain(1, '-Next');
+runMain(0, '-Next');
+runAttachCommander('-Next');
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);

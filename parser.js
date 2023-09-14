@@ -39,14 +39,22 @@ const jassparse = {
 				}
 			}
 			{
-				const callMatch = inputLines[i].match(/^\s*call ([a-zA-Z0-9_]+)\((.*)\)\s*$/);
+				const callMatch = inputLines[i].match(/^\s*(?:call\s+|set [a-zA-Z0-9_]+\s*?=\s*)([a-zA-Z0-9_]+)\((.*)\)\s*$/);
 				if (callMatch) {
 					if (options.onCreateNode) {
-						options.onCreateNode({
+						const callExpressionNode = {
 							type: 'CallExpression',
 							base: {type: 'Identifier', name: callMatch[1]},
 							arguments: callMatch[2].split(/,/).map(jassparse.parseFnArg),
-						});
+						};
+						options.onCreateNode(callExpressionNode);
+						if (!/^\s*call/.test(callMatch[0])) {
+							options.onCreateNode({
+								type: 'AssignmentStatement',
+								variables: [{name: /^\s*set ([a-zA-Z0-9_]+)/.exec(callMatch[0])[1]}],
+								init: [callExpressionNode],
+							});
+						}
 					}
 				}
 			}
