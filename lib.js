@@ -440,14 +440,15 @@ function delFolders(rootDirs, options = {}) {
 				rootDirs.push(path.resolve(rootDir, name));
 				allDirs.push(path.resolve(rootDir, name));
 			} else {
-				fs.unlinkSync(path.resolve(rootDir, name));
+				try {
+					fs.unlinkSync(path.resolve(rootDir, name));
+				} catch (err) {
+					return false;
+				}
 			}
 		}
 	}
-	// Not needed
-	/*while (allDirs.length) {
-		fs.rmdirSync(allDirs.pop());
-	}*/
+	return true;
 }
 
 module.exports = {

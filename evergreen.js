@@ -328,6 +328,10 @@ function updateMapHashes(wc3_data_path, sub_folder) {
 }
 
 function runUpdate(opts) {
+	if (opts.deploy && !opts.adaptSeasonalMaps && !opts.useCachedBackports) {
+		throw new Error(`Either deploy from cache or from new adaption (deploy=true requires opts.useCachedBackports, or opts.adaptSeasonalMaps)`);
+	}
+
 	let hasCachedProto = qHasCachedProto();
 	if (opts.extractPrototype && !hasCachedProto) extractProto();
 	if (opts.extractSeasonalMaps) {
@@ -338,14 +342,14 @@ function runUpdate(opts) {
 
 	let useReleased = opts.useCachedBackports && hasCachedProto;
 	if (!useReleased) {
-		delFolders([backportsDir]);
+		if (!delFolders([backportsDir])) throw new Error(`Unable to delete backports folder (${backportsDir}).`);
 		if (opts.adaptSeasonalMaps) {
 			batchAdapt(adaptedDir, 'legacy', backportsDir);
 			batchAdapt(upstreamDir, 'latest', backportsDir);
 		}
 	}
 	if (!useReleased) {
-		delFolders([releaseDir]);
+		if (!delFolders([releaseDir])) throw new Error(`Unable to delete release folder (${releaseDir}).`);
 		mergeUpstreamIntoCopies(opts.optimize);
 		// If optimize is false, mergeUpstreamIntoCopies writes directly to releaseDir
 		useReleased = !opts.optimize;
@@ -363,15 +367,16 @@ function runUpdate(opts) {
 	}
 	if (opts.deploy) {
 		if (!hasCachedProto && opts.deployPath.prune) {
-			delFolders([
+			if (!delFolders([
 				path.resolve(opts.deployPath.root, 'Maps', opts.deployPath.subFolder),
 				path.resolve(opts.deployPath.root, 'Maps', `${opts.deployPath.subFolder}-Cmdr`),
-			], {allowOutside: true});
+			], {allowOutside: true})) throw new Error(`Unable to delete deploy folder (${opts.deployPath.subFolder}).`);
 		}
 		copyToWorkingWC3(opts.deployPath.root, opts.deployPath.subFolder);
 		updateMapHashes(opts.deployPath.root, opts.deployPath.subFolder);
 	}
 	cacheProtoHash();
+	return true;
 }
 
 function useMapSet(i) {
@@ -384,6 +389,24 @@ function runAttachCommander(suffix = '') {
 	const deployRoot = path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III');
 	installAMAICommander(deployRoot, `Evergreen${suffix}`, `Evergreen-Cmdr${suffix}`);
 	updateMapHashes(deployRoot, `Evergreen-Cmdr${suffix}`);
+}
+
+function runDeploy(mapSet, suffix = '') {
+	useMapSet(mapSet);
+	runUpdate({
+		extractPrototype: false, /* ignored if cached */
+		extractSeasonalMaps: false, // true
+		adaptSeasonalMaps: false, /* ignored if cached */
+		useCachedBackports: true, // false
+		installAI: false, // true
+		optimize: false, // true
+		deploy: true,
+		deployPath: {
+			prune: true,
+			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
+			subFolder: `Evergreen${suffix}`,
+		},
+	});
 }
 
 function runMain(mapSet, suffix = '') {
@@ -405,9 +428,24 @@ function runMain(mapSet, suffix = '') {
 }
 
 let t = process.hrtime();
-runMain(1, '-Next');
-runMain(0, '-Next');
+let errors = [];
+try {
+	runMain(1, '-Next');
+} catch (err) {
+	errors.push(err);
+	console.error(err.message);
+}
+try {
+	runMain(0, '-Next');
+} catch {
+	errors.push(err);
+	console.error(err.message);
+}
 runAttachCommander('-Next');
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);
+if (errors.length) {
+	console.error(`${errors.length} errors.`);
+	for (const error of errors) console.error(error);
+}
