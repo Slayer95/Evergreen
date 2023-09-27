@@ -11,8 +11,8 @@ function objectCostsToSource() {
 		if (goldcost) output.push(`call SaveInteger(udg_RFObjectCost, 0, '${id}', ${goldcost})`);
 		if (lumbercost) output.push(`call SaveInteger(udg_RFObjectCost, 1, '${id}', ${lumbercost})`);
 		if (prev) { // Delta = Upgrade cost
-			output.push(`call SaveInteger(udg_RFObjectCost, 2, '${id}', ${goldcost - map.get(prev).goldcost})`);
-			output.push(`call SaveInteger(udg_RFObjectCost, 3, '${id}', ${lumbercost - map.get(prev).lumbercost})`);
+			output.push(`call SaveInteger(udg_RFObjectCost, 2, '${id}', ${goldcost - UnitBalance.get(prev).goldcost})`);
+			output.push(`call SaveInteger(udg_RFObjectCost, 3, '${id}', ${lumbercost - UnitBalance.get(prev).lumbercost})`);
 		}
 	}
 	for (const [id, {goldbase, goldmod, lumberbase, lumbermod}] of UpgradeData) {
