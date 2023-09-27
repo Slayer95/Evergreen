@@ -294,6 +294,7 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
 		const unitsPath = path.resolve(rootPath, outFolder, 'war3mapUnits.doo');
 		let doodads;
 		try {
+			/*if (mapFile === '(4)dejavu_s2_v1.5.w3x') throw new Error(`Deja Vu bad locale.`);*/
 			doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
 		} catch (err) {
 			console.error(err);
@@ -352,7 +353,7 @@ function getMapDescStrings(folder) {
 	return MAP_DESC_STRINGS.reduce((meta, key) => {
 		if (!mapInfo.map[key]) return meta;
 		const index = parseInt(mapInfo.map[key].slice(8));
-		meta[key] = strings[index];
+		meta[key] = strings[index].normalize('NFD').replace(/[^\x00-\xFF]/g, '');
 		return meta;
 	}, {});
 }

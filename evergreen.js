@@ -437,7 +437,7 @@ try {
 }
 try {
 	runMain(0, '-Next');
-} catch {
+} catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
