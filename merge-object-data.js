@@ -76,8 +76,8 @@ async function getConsolidatedOfType(type) {
 			if (SPECIAL_VALUES.has(value)) {
 				entry[key] = SPECIAL_VALUES.get(value);
 			}
-			if (FROM_UPGRADES.has(key)) value.prev = FROM_UPGRADES.get(key);
 		}
+		if (FROM_UPGRADES.has(id)) entry.prev = FROM_UPGRADES.get(id);
 	}
 	return merged;
 }
