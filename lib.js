@@ -409,8 +409,7 @@ function removeVowels(input) {
 	return input.replace(/a|e|i|o|u|[^a-zA-Z0-9\.]/g, '');
 }
 
-function brandMap(baseName, version) {
-	const suffix = '(1.26)';
+function brandMap(baseName, version, suffix = '(1.26)') {
 	baseName = baseName.replace(/_v\d+(.\d+)?$/, '');
 	baseName = baseName.replace(/_s\d+$/, '');
 	let firstVowelMatch = baseName.match(/[aeiou]/);

@@ -6,6 +6,8 @@ const util = require('util');
 const path = require('path');
 const crypto = require('crypto');
 
+const USE_OPINIONATED_FORCES = false;
+
 const {
 	InfoLegacy, DoodadsLegacy, UnitsLegacy, StringsLegacy,
 	InfoLatest, DoodadsLatest, UnitsLatest, StringsLatest,
@@ -42,6 +44,7 @@ const {
 
 const {
 	insertMeta,
+	lintJass,
 	mergeGlobals,
 	mergeInitialization,
 } = require('./generator');
@@ -86,7 +89,14 @@ function mergeUpstreamIntoCopies(willOpt) {
 	const AMAIVersion = getAMAIVersion();
 	for (const folder of folderContents) {
 		if (!folderContents.has(`${folder}.w3x`)) continue;
-		const hash = getMapHash(path.resolve(upstreamDir, `${folder}.w3x`));
+		let hash;
+		if (fs.existsSync(path.resolve(upstreamDir, `${folder}.w3x.0`))) {
+			// Some maps (e.g. 2023S2 Eversong v1.1) need to be saved with latest WorldEdit before it can be read by MapAdapter, etc
+			// The .0 file is the original map file.
+			hash = getMapHash(path.resolve(upstreamDir, `${folder}.w3x.0`));
+		} else {
+			hash = getMapHash(path.resolve(upstreamDir, `${folder}.w3x`));
+		}
 		const portFolder = path.resolve(backportsDir, folder);
 		try {
 			fs.mkdirSync(portFolder);
@@ -106,13 +116,28 @@ function mergeUpstreamIntoCopies(willOpt) {
 		// Create strings file
 		const mapMetaTexts = getMapDescStrings(path.resolve(upstreamDir, folder))
 		const editedStrings = Object.assign({}, protoStrings);
+		let maxStringIndex = -1;
+		for (const key in editedStrings) {
+			let num = Number(key);
+			if (num > maxStringIndex) maxStringIndex = num;
+		}
+		for (let i = 0; i < 6; i++) {
+			/* GHost: WorldEdit supports up to 6 named forces. Hack to support 12 forces. */
+			editedStrings[`${maxStringIndex + i + 1}`] = `Force ${7 + i}`;
+		}
 		for (let i = 0; i < MAP_DESC_STRINGS.length; i++) {
 			if (MAP_DESC_STRINGS[i] in mapMetaTexts) {
 				editedStrings[lookupStringsIndices[i]] = mapMetaTexts[MAP_DESC_STRINGS[i]];
+				if (MAP_DESC_STRINGS[i] === 'author') {
+					editedStrings[lookupStringsIndices[i]] += `, and IceSandslash`;
+				} else if (MAP_DESC_STRINGS[i] === 'description') {
+					editedStrings[lookupStringsIndices[i]] = editedStrings[lookupStringsIndices[i]].trim() + ` Evergreen edition.`;
+				}
 			} else {
 				delete editedStrings[lookupStringsIndices[i]];
 			}
 		}
+		const isSupportsFFA = editedStrings[lookupStringsIndices[MAP_DESC_STRINGS.indexOf('recommendedPlayers')]]?.includes('FFA');
 		const outStringsPath = path.resolve(portFolder, 'war3map.wts');
 		writeWar(outStringsPath, StringsLegacy, editedStrings);
 
@@ -121,6 +146,66 @@ function mergeUpstreamIntoCopies(willOpt) {
 		const mapInfo = deepClone(protoInfo);
 		mapInfo.camera = deepClone(upstreamMapInfo.camera);
 		mapInfo.players = deepClone(upstreamMapInfo.players);
+		for (const player of mapInfo.players) {
+			/* GHost: Default to (unselectable) random races, rather than WorldEdit defaults */
+			player.race = 0;
+		}
+
+		mapInfo.forces = deepClone(upstreamMapInfo.forces);
+		const forceNames = protoInfo.forces.map(force => force.name);
+		assert.strictEqual(forceNames.length, 6, `Expected 6 named forces in prototype map.`);
+		for (let i = 0; i < 6; i++) {
+			/* GHost: WorldEdit supports up to 6 named forces. Hack to support 12 forces. */
+			forceNames.push(forceNames.at(-1).replace(/\d+$/, match => `${maxStringIndex + i + 1}`.padStart(match.length, '0')));
+		}
+		
+		const protoForce = mapInfo.forces[0];
+
+		/* InfoTranslator.js@1.1.0:134
+		outBuffer.addInt(force.players === -1 ? (1 << 11) - 1 : force.players);
+		*/
+		mapInfo.forces.splice(1, mapInfo.forces.length);
+		{
+			/* GHost: Default to FFA */
+			protoForce.flags.allied = false;
+			protoForce.flags.alliedVictory = false;
+			protoForce.players = 1;
+			let allUsedPlayers = 0;
+			for (let i = 1; i < upstreamMapInfo.players.length; i++) {
+				mapInfo.forces.push(deepClone(protoForce));
+				mapInfo.forces.at(-1).players <<= i;
+				allUsedPlayers |= mapInfo.forces.at(-1).players;
+			}
+			protoForce.players = ~allUsedPlayers;
+		}
+		/*
+		else if (USE_OPINIONATED_FORCES && upstreamMapInfo.players.length <= 6) {
+			if (isSupportsFFA) {
+				protoForce.flags.allied = false;
+				protoForce.flags.alliedVictory = false;
+				protoForce.players = 1;
+				let allUsedPlayers = 0;
+				for (let i = 1; i < upstreamMapInfo.players.length; i++) {
+					mapInfo.forces.push(deepClone(protoForce));
+					mapInfo.forces.at(-1).players <<= i;
+					allUsedPlayers |= mapInfo.forces.at(-1).players;
+				}
+				protoForce.players = ~allUsedPlayers;
+			} else {
+				protoForce.flags.allied = true;
+				protoForce.flags.alliedVictory = true;
+				protoForce.players = (1 << (upstreamMapInfo.players.length >> 1)) - 1;
+				mapInfo.forces.push(deepClone(protoForce));
+				mapInfo.forces.at(-1).players = ((1 << upstreamMapInfo.players.length) - 1) & (~protoForce.players);
+				protoForce.players = ~mapInfo.forces.at(-1).players;
+			}
+		}
+		//*/
+		for (let i = 0; i < mapInfo.forces.length; i++) {
+			mapInfo.forces[i].name = forceNames[Math.min(forceNames.length - 1, i)];
+		}
+		mapInfo.map.flags.useCustomForces = false;
+
 		mapInfo.map.playableArea = deepClone(upstreamMapInfo.map.playableArea);
 		mapInfo.map.mainTileType = deepClone(upstreamMapInfo.map.mainTileType);
 		mapInfo.customSoundEnvironment = upstreamMapInfo.customSoundEnvironment;
@@ -143,6 +228,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 		//console.log(`Rewriting ${path.relative(process.cwd(), outJassPath)}...`);
 		let outJassString = protoJass;
 		outJassString = stripProtoJass(outJassString);
+		outJassString = lintJass(outJassString);
 		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts}, {
 			version: evergreenVersion,
 			author: evergreenAuthor,
@@ -152,6 +238,14 @@ function mergeUpstreamIntoCopies(willOpt) {
 		});
 		outJassString = mergeGlobals(outJassString, main, config);
 		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
+		{
+			const re = /(call +SetPlayerTeam\(\s*Player\(\s*)(\d+)(\s*\)\s*,\s*)(\d+)(\s*\))/g;
+			let match;
+			while (match = re.exec(outJassString)) {
+				outJassString = outJassString.slice(0, match.index) + match[1] + match[2] + match[3] + match[2] + match[5] + outJassString.slice(match.index + match[0].length);
+			}
+		}
+		outJassString = outJassString.replace(/RACE_PREF_(HUMAN|ORC|NIGHTELF|UNDEAD)/g, `RACE_PREF_USER_SELECTABLE`);
 		fs.writeFileSync(outJassPath, outJassString);
 
 		const editedFiles = [
@@ -190,7 +284,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromUpstream, fileName], {cwd: path.resolve(upstreamDir, folder)});
 		}
 		const nameBuffer = Buffer.from(`${mapMetaTexts.name.replace(/ v\d+(.\d+)?$/, '')} ${evergreenVersion}`);
-		const outName = brandMap(folder, evergreenVersion);
+		const outName = brandMap(folder, evergreenVersion, '');
 		const sanitizedName = outName.replace(/^\((\d+)\)/, '$1_').replace(/\(([\.\d]+)\)\.w3x$/, (match, $1) => '_' + Buffer.from($1).toString('hex') + '.w3x');
 		releaseMapNames.set(sanitizedName, nameBuffer);
 
@@ -398,8 +492,8 @@ function runDeploy(mapSet, suffix = '') {
 		extractSeasonalMaps: false, // true
 		adaptSeasonalMaps: false, /* ignored if cached */
 		useCachedBackports: true, // false
-		installAI: false, // true
-		optimize: false, // true
+		installAI: false, // false
+		optimize: false, // false
 		deploy: true,
 		deployPath: {
 			prune: true,
@@ -430,18 +524,18 @@ function runMain(mapSet, suffix = '') {
 let t = process.hrtime();
 let errors = [];
 try {
-	runMain(1, '-Next');
+	runMain(1, '-N2');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
 try {
-	runMain(0, '-Next');
+	runMain(0, '-N2');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
-runAttachCommander('-Next');
+runAttachCommander('-N2');
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);

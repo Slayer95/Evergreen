@@ -12,11 +12,13 @@ const {Transform} = require('stream');
 
 const outPath = path.resolve(__dirname, 'costs.json');
 const ID_KEYS = new Map([
+	['AbilityData', 'alias'],
 	['DestructableData', 'DestructableID'],
 	['Doodads', 'doodID'],
 	['ItemData', 'itemID'],
 	['UnitBalance', 'unitBalanceID'],
 	['UnitData', 'unitID'],
+	['UnitWeapons', 'unitWeapID'],
 	['UpgradeData', 'upgradeid'],
 ]);
 
@@ -31,7 +33,7 @@ const FROM_UPGRADES = new Map([
 	['hcas', 'hkee'],
 	['hgtw', 'hwtw'],
 	['hctw', 'hwtw'],
-	['hatw', 'hctw'],
+	['hatw', 'hwtw'],
 	['ostr', 'ogre'],
 	['ofrt', 'ostr'],
 	['unp1', 'unpl'],
