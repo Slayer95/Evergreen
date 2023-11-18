@@ -158,6 +158,8 @@ function mergeUpstreamIntoCopies(willOpt) {
 		}
 		
 		const protoForce = mapInfo.forces[0];
+		protoForce.flags.allied = true;
+		protoForce.flags.alliedVictory = true;
 
 		/* InfoTranslator.js@1.1.0:134
 		outBuffer.addInt(force.players === -1 ? (1 << 11) - 1 : force.players);
@@ -165,8 +167,6 @@ function mergeUpstreamIntoCopies(willOpt) {
 		mapInfo.forces.splice(1, mapInfo.forces.length);
 		if (defaultGHostTeams === 'NvN') {
 			/* GHost: Force team-up for Synergy, etc.*/
-			protoForce.flags.allied = true;
-			protoForce.flags.alliedVictory = true;
 			protoForce.players = (1 << (mapInfo.players.length >> 1)) - 1;
 			mapInfo.forces.push(deepClone(protoForce));
 			mapInfo.forces.at(-1).players <<= (mapInfo.players.length >> 1);
@@ -174,8 +174,6 @@ function mergeUpstreamIntoCopies(willOpt) {
 		} else {
 			let factor = defaultGHostTeams === 'Pairs' ? 2 : 1;
 			/* GHost: Default to FFA */
-			protoForce.flags.allied = false;
-			protoForce.flags.alliedVictory = false;
 			protoForce.players = 1;
 			let allUsedPlayers = 0;
 			for (let i = 1; i < upstreamMapInfo.players.length / factor; i++) {
