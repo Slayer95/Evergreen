@@ -6,8 +6,6 @@ const util = require('util');
 const path = require('path');
 const crypto = require('crypto');
 
-const USE_OPINIONATED_FORCES = false;
-
 const {
 	InfoLegacy, DoodadsLegacy, UnitsLegacy, StringsLegacy,
 	InfoLatest, DoodadsLatest, UnitsLatest, StringsLatest,
@@ -137,7 +135,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 				delete editedStrings[lookupStringsIndices[i]];
 			}
 		}
-		const isSupportsFFA = editedStrings[lookupStringsIndices[MAP_DESC_STRINGS.indexOf('recommendedPlayers')]]?.includes('FFA');
+		const defaultGHostTeams = /synergy|friends/.test(folder) ? 'Pairs' : (/\b(\d)vs?\1\b/.test(folder) ? 'NvN' : 'FFA');
 		const outStringsPath = path.resolve(portFolder, 'war3map.wts');
 		writeWar(outStringsPath, StringsLegacy, editedStrings);
 
@@ -165,41 +163,29 @@ function mergeUpstreamIntoCopies(willOpt) {
 		outBuffer.addInt(force.players === -1 ? (1 << 11) - 1 : force.players);
 		*/
 		mapInfo.forces.splice(1, mapInfo.forces.length);
-		{
+		if (defaultGHostTeams === 'NvN') {
+			/* GHost: Force team-up for Synergy, etc.*/
+			protoForce.flags.allied = true;
+			protoForce.flags.alliedVictory = true;
+			protoForce.players = (1 << (mapInfo.players.length >> 1)) - 1;
+			mapInfo.forces.push(deepClone(protoForce));
+			mapInfo.forces.at(-1).players <<= (mapInfo.players.length >> 1);
+			protoForce.players = ~mapInfo.forces.at(-1).players; /* Fill higher-order bytes */
+		} else {
+			let factor = defaultGHostTeams === 'Pairs' ? 2 : 1;
 			/* GHost: Default to FFA */
 			protoForce.flags.allied = false;
 			protoForce.flags.alliedVictory = false;
 			protoForce.players = 1;
 			let allUsedPlayers = 0;
-			for (let i = 1; i < upstreamMapInfo.players.length; i++) {
+			for (let i = 1; i < upstreamMapInfo.players.length / factor; i++) {
 				mapInfo.forces.push(deepClone(protoForce));
-				mapInfo.forces.at(-1).players <<= i;
+				mapInfo.forces.at(-1).players <<= i * factor;
 				allUsedPlayers |= mapInfo.forces.at(-1).players;
 			}
-			protoForce.players = ~allUsedPlayers;
+			protoForce.players = ~allUsedPlayers; /* Fill higher-order bytes */
 		}
-		/*
-		else if (USE_OPINIONATED_FORCES && upstreamMapInfo.players.length <= 6) {
-			if (isSupportsFFA) {
-				protoForce.flags.allied = false;
-				protoForce.flags.alliedVictory = false;
-				protoForce.players = 1;
-				let allUsedPlayers = 0;
-				for (let i = 1; i < upstreamMapInfo.players.length; i++) {
-					mapInfo.forces.push(deepClone(protoForce));
-					mapInfo.forces.at(-1).players <<= i;
-					allUsedPlayers |= mapInfo.forces.at(-1).players;
-				}
-				protoForce.players = ~allUsedPlayers;
-			} else {
-				protoForce.flags.allied = true;
-				protoForce.flags.alliedVictory = true;
-				protoForce.players = (1 << (upstreamMapInfo.players.length >> 1)) - 1;
-				mapInfo.forces.push(deepClone(protoForce));
-				mapInfo.forces.at(-1).players = ((1 << upstreamMapInfo.players.length) - 1) & (~protoForce.players);
-				protoForce.players = ~mapInfo.forces.at(-1).players;
-			}
-		}
+
 		//*/
 		for (let i = 0; i < mapInfo.forces.length; i++) {
 			mapInfo.forces[i].name = forceNames[Math.min(forceNames.length - 1, i)];
@@ -242,7 +228,8 @@ function mergeUpstreamIntoCopies(willOpt) {
 			const re = /(call +SetPlayerTeam\(\s*Player\(\s*)(\d+)(\s*\)\s*,\s*)(\d+)(\s*\))/g;
 			let match;
 			while (match = re.exec(outJassString)) {
-				outJassString = outJassString.slice(0, match.index) + match[1] + match[2] + match[3] + match[2] + match[5] + outJassString.slice(match.index + match[0].length);
+				let teamIndex = defaultGHostTeams === 'NvN' ? ~~(Number(match[2]) >= (mapInfo.players.length >> 1)) : (defaultGHostTeams === 'Pairs' ? (Number(match[2]) >> 1) : Number(match[2]));
+				outJassString = outJassString.slice(0, match.index) + match[1] + match[2] + match[3] + teamIndex.toString(10) + match[5] + outJassString.slice(match.index + match[0].length);
 			}
 		}
 		outJassString = outJassString.replace(/RACE_PREF_(HUMAN|ORC|NIGHTELF|UNDEAD)/g, `RACE_PREF_USER_SELECTABLE`);
@@ -524,18 +511,18 @@ function runMain(mapSet, suffix = '') {
 let t = process.hrtime();
 let errors = [];
 try {
-	runMain(1, '-N2');
+	runMain(1, '-N');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
 try {
-	runMain(0, '-N2');
+	runMain(0, '-N');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
-runAttachCommander('-N2');
+runAttachCommander('-N');
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);
