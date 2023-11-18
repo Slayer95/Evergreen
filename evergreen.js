@@ -166,14 +166,16 @@ function mergeUpstreamIntoCopies(willOpt) {
 		*/
 		mapInfo.forces.splice(1, mapInfo.forces.length);
 		if (defaultGHostTeams === 'NvN') {
-			/* GHost: Force team-up for Synergy, etc.*/
+			/* Forced team-up in GHost default config. */
 			protoForce.players = (1 << (mapInfo.players.length >> 1)) - 1;
 			mapInfo.forces.push(deepClone(protoForce));
 			mapInfo.forces.at(-1).players <<= (mapInfo.players.length >> 1);
 			protoForce.players = ~mapInfo.forces.at(-1).players; /* Fill higher-order bytes */
 		} else {
-			let factor = defaultGHostTeams === 'Pairs' ? 2 : 1;
-			/* GHost: Default to FFA */
+			let factor = (defaultGHostTeams === 'Pairs' ?
+				2 /* Synergy, Friends, Heart To Heart, etc. */ :
+				1 /* Default to FFA */
+			);
 			protoForce.players = 1;
 			let allUsedPlayers = 0;
 			for (let i = 1; i < upstreamMapInfo.players.length / factor; i++) {
@@ -223,6 +225,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 		outJassString = mergeGlobals(outJassString, main, config);
 		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
 		{
+			// W3 calls the config function to setup the match slots.
 			const re = /(call +SetPlayerTeam\(\s*Player\(\s*)(\d+)(\s*\)\s*,\s*)(\d+)(\s*\))/g;
 			let match;
 			while (match = re.exec(outJassString)) {
