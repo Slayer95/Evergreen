@@ -480,7 +480,7 @@ function useMapSet(i) {
 }
 
 function runAttachCommander(suffix = '') {
-	const deployRoot = path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III');
+	const deployRoot = path.resolve(__dirname, '..', '..', '..', 'Games', 'WC3');
 	installAMAICommander(deployRoot, `Evergreen${suffix}`, `Evergreen-Cmdr${suffix}`);
 	updateMapHashes(deployRoot, `Evergreen-Cmdr${suffix}`);
 }
@@ -497,7 +497,7 @@ function runDeploy(mapSet, suffix = '') {
 		deploy: true,
 		deployPath: {
 			prune: true,
-			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
+			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'WC3'),
 			subFolder: `Evergreen${suffix}`,
 		},
 	});
@@ -515,7 +515,7 @@ function runMain(mapSet, suffix = '') {
 		deploy: true,
 		deployPath: {
 			prune: true,
-			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'Warcraft III'),
+			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'WC3'),
 			subFolder: `Evergreen${suffix}`,
 		},
 	});

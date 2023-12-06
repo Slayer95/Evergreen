@@ -5,6 +5,7 @@
   "main": "evergreen.js",
   "dependencies": {
     "csv-reader": "^1.0.12",
+    "ini": "^4.1.1",
     "luaparse": "^0.3.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.1.6",
