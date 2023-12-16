@@ -91,6 +91,10 @@ async function main() {
 		.map(name => name.slice(0, -path.extname(name).length))
 	);
 	for (const type of types) {
+		if (!ID_KEYS.has(type)) {
+			console.log(`Skipping unhandled ${type}...`);
+			continue;
+		}
 		console.log(`Merging ${type}...`);
 		const consolidated = await getConsolidatedOfType(type);
 		fs.writeFileSync(path.resolve(__dirname, 'data', `${type}.json`), JSON.stringify(Array.from(consolidated)));

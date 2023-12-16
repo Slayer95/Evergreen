@@ -6,7 +6,23 @@ const {objectCostsToSource, sunderingUnitsToSource, heroAbilitiesToSource, unitB
 
 const invalidPatterns = [
 	/GetConvertedPlayerId\(([a-zA-Z0-9_ \(\)]+)\) \+ 1/g,
-]
+];
+
+const contradictoryConditions = new Set([
+	`if false then`,
+	`if true == false then`,
+	`if false == true then`,
+	`if ( true == false ) then`,
+	`if ( false == true ) then`,
+	`if udg_DEAD_CODE then`,
+	`if udg_DEAD_CODE == true then`,
+	`if ( udg_DEAD_CODE == true ) then`,
+]);
+
+const negatedContradictoryConditions = new Set();
+for (const condition of contradictoryConditions) {
+	negatedContradictoryConditions.add(`if ( not ( ${condition.slice(3, -5)} ) ) then`);
+}
 
 function lua2jass(node, source) {
 	const lines = source.split(/\r?\n/);
@@ -139,6 +155,67 @@ function insertMeta(jassCode, meleeMeta, evergreenMeta) {
 	return jassCode;
 }
 
+function removeDeadCode(jassCode) {
+	let inputLines = jassCode.split('\n');
+	let outputLines = [];
+	let deadCodeDepth = 0;
+	let ifDepth = 0;
+	let fnName = '';
+	let alwaysFalseFunctions = new Set();
+	let fnBody = [];
+	let alwaysFalseFunctionDeclarationLines = new Set();
+	for (let i = 0; i < inputLines.length; i++) {
+		let trimmed = inputLines[i].trim();
+		if (trimmed.startsWith(`function `)) {
+			fnName = trimmed.slice(9).split(` takes `, 1)[0];
+			continue;
+		} else if (trimmed.startsWith(`endfunction`)) {
+			if (fnBody.length === 4 && (
+				negatedContradictoryConditions.has(fnBody[0]) && fnBody[1] === `return false` && fnBody[2] === `endif` && fnBody[3] === `return true` ||
+				contradictoryConditions.has(fnBody[0]) && fnBody[1] === `return true` && fnBody[2] === `endif` && fnBody[3] === `return false`
+			)) {
+				alwaysFalseFunctionDeclarationLines.add(i - 5);
+				alwaysFalseFunctions.add(fnName);
+			}
+			fnName = '';
+			fnBody.length = 0;
+		}
+		if (fnName) fnBody.push(trimmed);
+	}
+
+	for (let i = 0; i < inputLines.length; i++) {
+		if (alwaysFalseFunctionDeclarationLines.has(i)) {
+			i += 5;
+			continue;
+		}
+		let trimmed = inputLines[i].trim();
+		if (trimmed.startsWith(`if `)) {
+			ifDepth++;
+		} else if (trimmed.startsWith(`endif`)) {
+			if (deadCodeDepth === ifDepth) {
+				deadCodeDepth = 0;
+				ifDepth--;
+				continue;
+			}
+			ifDepth--;
+		}
+		if (contradictoryConditions.has(trimmed)) {
+			deadCodeDepth = ifDepth;
+		} else {
+			let fnCall = /^if \( ([a-zA-Z0-9_]+)\(\) \) then$/.exec(trimmed);
+			if (fnCall && alwaysFalseFunctions.has(fnCall[1])) {
+				deadCodeDepth = ifDepth;
+			}
+		}
+		if (deadCodeDepth) continue;
+		//w2l automatically removes unused variables
+		//if (/^boolean\s+udg_DEAD_CODE\s*=\s*false$/.test(trimmed)) continue;
+		outputLines.push(inputLines[i]);
+	}
+
+	return outputLines.join(`\n`);
+}
+
 function lintJass(jassCode) {
 	for (const re of invalidPatterns) {
 		const match = re.exec(jassCode);
@@ -146,9 +223,11 @@ function lintJass(jassCode) {
 			throw new Error(`Invalid code ${match[0]}.`, {cause: new Error(`Regexp matched ${re}`)});
 		}
 	}
+	jassCode = removeDeadCode(jassCode);
 	jassCode = jassCode.replace(/\( GetConvertedPlayerId\(([a-zA-Z0-9_ \(\)]+)\) \- 1 \)/g, `( GetPlayerId($1) )`),
 	jassCode = jassCode.replace(/GetPlayerName\([^\n]+\) == "WorldEdit"/g, `false`);
 
+	/*
 	let codeCoordinate = 0;
 	let multiBoardRegex = /call MultiboardSetItemValueBJ\( *([^,]+) *, *([^,]+) *, *([^,]+) *, *([^\n]+)\)\r?\n/g;
 	let jassCode2 = jassCode.replace(multiBoardRegex, (match, $1, $2, $3, $4) => {
@@ -160,7 +239,9 @@ ${match}
 `;
 	});
 	if (jassCode === jassCode2) throw new Error(`Replace invalid`);
+	
 	jassCode = jassCode2;
+	*/
 
 	/*
 	jassCode = jassCode.replace(/(call RemoveLocation\(udg_RH[^\)]+\))/g, `// $1`);
@@ -307,6 +388,7 @@ function mergeInitialization(mergedCode, main, config, functions, {dropItemsTrig
 module.exports = {
 	insertMeta,
 	lintJass,
+	removeDeadCode,
 	mergeGlobals,
 	mergeInitialization,
 };

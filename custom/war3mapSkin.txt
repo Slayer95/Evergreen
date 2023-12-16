@@ -1,0 +1,5 @@
+[FrameDef]
+QUESTSMAIN=About
+QUESTSOPTIONAL=Optional
+QUESTS=Info
+KEY_QUESTS=Info (|cffffcc00F9|r)

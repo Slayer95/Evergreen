@@ -8,19 +8,21 @@ const crypto = require('crypto');
 
 const {
 	InfoLegacy, DoodadsLegacy, UnitsLegacy, StringsLegacy,
-	InfoLatest, DoodadsLatest, UnitsLatest, StringsLatest,
+	InfoLatest,
 
 	spawnSync,
 	delFolders,
 	logOnce,
 	parseWar, writeWar, isMapFileName,
-	batchExtract, batchAdapt, getMapDescStrings,
+	batchExtract, batchAdapt,
+	getMapInfo, getMapDescStrings,
 	brandMap, coloredShortHash,
 	getDate,
 	getMapHash, qHasCachedProto, cacheProtoHash,
 	deepClone,
 	copyFileSync,
 	getAMAIVersion,
+	getSlkExtraListFiles,
 } = require('./lib');
 
 const {
@@ -112,7 +114,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 			fs.readFileSync(path.resolve(upstreamDir, folder, isLua ? `war3map.lua` : `war3map.j`), 'utf8'),
 			isLua ? 'lua' : 'jass2'
 		);
-		const upstreamMapInfo = parseWar(InfoLatest, path.resolve(upstreamDir, folder, 'war3map.w3i'));
+		const upstreamMapInfo = getMapInfo(path.resolve(upstreamDir, folder));
 
 		// Create strings file
 		const mapMetaTexts = getMapDescStrings(path.resolve(upstreamDir, folder))
@@ -226,7 +228,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 			author: evergreenAuthor,
 			date: evergreenDate,
 			generator: evergreenGenerator,
-			AMAIVersion: ['|cffffcc002.6.2|r', ...[AMAIVersion.public, AMAIVersion.private].map(coloredShortHash)].join(` .. `),
+			AMAIVersion: [AMAIVersion.brand, ...[AMAIVersion.public, AMAIVersion.private].map(coloredShortHash)].join(` .. `),
 		});
 		outJassString = mergeGlobals(outJassString, main, config);
 		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
@@ -304,7 +306,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 			
 			fs.writeFileSync(outPath, rawData);
 			fs.unlinkSync(path.resolve(portFolder, `${folder}.w3x`));
-			fs.writeFileSync(path.resolve(releaseDir, `${folder}.w3x`), rawData);
+			fs.writeFileSync(path.resolve(releaseDir, sanitizedName), rawData);
 		} else {
 			fs.renameSync(path.resolve(portFolder, `${folder}.w3x`), path.resolve(portFolder, '..', sanitizedName));
 		}
@@ -338,19 +340,28 @@ function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
 		} while (tmpNames.has(tmpName));
 		tmpNames.add(tmpName);
 		copyFileSync(path.resolve(fromFolder, fileName), path.resolve(outFolder, tmpName));
-		spawnSync(`InstallCommanderToMap.bat`, [tmpName], {/*stdio: 'inherit', */cwd: outFolder});
+		spawnSync(`InstallCommanderToMap.bat`, [`TFT`, tmpName], {/*stdio: 'inherit', */cwd: outFolder});
 		fs.renameSync(path.resolve(outFolder, tmpName), path.resolve(outFolder, fileName));
 	}
 }
 
-function optimizeMaps() {
+function optimizeMaps(useZopfli) {
 	const mapNames = fs.readdirSync(backportsDir).filter(isMapFileName);
+	const backportsFromRelease = path.relative(backportsDir, releaseDir);
 	for (const fileName of mapNames) {
 		console.log(`Optimizing ${fileName}...`);
 		spawnSync('w2l.exe', ['slk', path.resolve(backportsDir, fileName)], {cwd: backportsDir, stdio: 'inherit'});
+		if (useZopfli) {
+			spawnSync(`MPQEditor`, [`extract`, fileName, `(listfile)`, ".", `/fp`], {cwd: backportsDir});
+			const listFilePath = path.resolve(backportsDir, `${fileName}.list`);
+			const listFilePathFromRelease = path.relative(backportsDir, listFilePath);
+			fs.renameSync(path.resolve(backportsDir, `(listfile)`), listFilePath);
+			fs.appendFileSync(listFilePath, getSlkExtraListFiles());
+			spawnSync('compress-mpq.exe', [`-l`, listFilePathFromRelease, `${fileName.slice(0, -4)}_slk.w3x`, `${fileName.slice(0, -4)}_min.w3x`], {cwd: backportsDir, stdio: 'inherit'});
+		}
 		try {
 			fs.renameSync(
-				path.resolve(backportsDir, `${fileName.slice(0, -4)}_slk.w3x`),
+				path.resolve(backportsDir, useZopfli ? `${fileName.slice(0, -4)}_min.w3x` : `${fileName.slice(0, -4)}_slk.w3x`),
 				path.resolve(releaseDir, fileName),
 			);
 		} catch (err) {
@@ -456,7 +467,7 @@ function runUpdate(opts) {
 	}
 	if (opts.optimize) {
 		// Requires w3x2lni in PATH
-		optimizeMaps();
+		optimizeMaps(opts.useZopfli);
 		setDisplayNamesInPlace();
 	}
 	if (opts.deploy) {
@@ -512,6 +523,7 @@ function runMain(mapSet, suffix = '') {
 		useCachedBackports: false, // false
 		installAI: true, // true
 		optimize: true, // true
+		useZopfli: true, // false
 		deploy: true,
 		deployPath: {
 			prune: true,

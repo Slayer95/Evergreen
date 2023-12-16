@@ -164,6 +164,15 @@ function coloredHash(input) {
 	return coloredString(input, true);
 }
 
+function getAltSourceFolder(folder) {
+	const triedFolder = path.basename(folder);
+	if (triedFolder.includes('-auto')) {
+		return path.resolve(folder, '..', triedFolder.replace('-auto', ''));
+	} else {
+		return path.resolve(folder, '..', triedFolder.replace('-maps', '-maps-auto'));
+	}
+}
+
 function exists(type, code) {
 	switch (type) {
 	case 'doodad': return DataExists.Doodads.has(code);
@@ -233,7 +242,7 @@ function parseWar(handler, path) {
 	try {
 		result = handler.warToJson(fs.readFileSync(path));
 	} catch (err) {
-		throw new Error(`Internal error parsing ${path}`, {cause: err});
+		throw new Error(`Error parsing ${path}`, {cause: err});
 	}
 	if (result.errors.length) throw new AggregateError(result.errors);
 	return result.json;
@@ -284,7 +293,7 @@ function batchExtract(rootPath) {
 	}
 }
 
-function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
+function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = true) {
 	//console.log(`[batchAdapt-${mode}] ${rootPath}->${rewriteFolder}`);
 	const mapFiles = fs.readdirSync(rootPath).filter(isMapFileName);
 	if (!mapFiles.length) throw new Error(`No maps found in ${rootPath}`);
@@ -297,25 +306,26 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
 			/*if (mapFile === '(4)dejavu_s2_v1.5.w3x') throw new Error(`Deja Vu bad locale.`);*/
 			doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
 		} catch (err) {
-			console.error(err);
-			const fbPath = path.resolve(rootPath, '..', path.basename(rootPath).replace('-auto', ''), outFolder, 'war3map.doo');
-			console.error(`File not correctly adapted: ${doodadsPath}`);
-			console.error(`Falling back to: ${fbPath}\n`);
+			if (!allowFallback) throw err;
+			console.error(err.stack);
+			const fbPath = path.resolve(getAltSourceFolder(rootPath), outFolder, 'war3map.doo');
+			console.error(`File does not meet ${mode} spec: ${doodadsPath}`);
+			console.error(`Falling back to ${mode === 'latest' ? 'legacy' : 'latest'}: ${fbPath}\n`);
 			/*spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: path.basename(rootPath).replace('-auto', '')});*/
-			doodads = parseWar(DoodadsLatest, fbPath);
+			doodads = parseWar(mode === 'legacy' ? DoodadsLatest : DoodadsLegacy, fbPath);
 		}
 		let units;
 		try {
 			units = parseWar(mode === 'legacy' ? UnitsLegacy : UnitsLatest, unitsPath);
 		} catch (err) {
-			console.error(err);
-			const fbPath = path.resolve(rootPath, '..', path.basename(rootPath).replace('-auto', ''), outFolder, 'war3mapUnits.doo');
-			console.error(`File not correctly adapted: ${unitsPath}`);
-			console.error(`Falling back to: ${fbPath}\n`);
+			if (!allowFallback) throw err;
+			console.error(err.stack);
+			const fbPath = path.resolve(getAltSourceFolder(rootPath), outFolder, 'war3mapUnits.doo');
+			console.error(`File does not meet ${mode} spec: ${unitsPath}`);
+			console.error(`Falling back to ${mode === 'latest' ? 'legacy' : 'latest'}: ${fbPath}\n`);
 			/*spawnSync(`MPQEditor`, [`extract`, mapFile, `*`, outFolder, `/fp`], {cwd: path.basename(rootPath).replace('-auto', '')});*/
-			units = parseWar(UnitsLatest, fbPath);
+			units = parseWar(mode === 'legacy' ? UnitsLatest : UnitsLegacy, fbPath);
 		}
-
 
 		for (const doodad of doodads) {
 			if (doodad.type in replacements.Doodads) {
@@ -347,9 +357,37 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder) {
 	}
 }
 
-function getMapDescStrings(folder) {
-	const mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
-	const strings = parseWar(StringsLatest, path.resolve(folder, 'war3map.wts'));
+function getMapInfo(folder, allowFallback = true) {
+	let mapInfo;
+	try {
+		mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
+	} catch (err) {
+		if (!allowFallback) throw err
+		console.error(err.stack);
+		mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
+		console.error('Fallback OK');
+	}
+	return mapInfo;
+}
+
+function getMapDescStrings(folder, allowFallback = true) {
+	let mapInfo;
+	let strings;
+	try {
+		mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
+	} catch (err) {
+		if (!allowFallback) throw err;
+		mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
+		console.error('Fallback OK');
+	}
+	try {
+		strings = parseWar(StringsLatest, path.resolve(folder, 'war3map.wts'));
+	} catch (err) {
+		if (!allowFallback) throw err;
+		console.error(err.stack);
+		strings = parseWar(StringsLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.wts'));
+		console.error('Fallback OK');
+	}
 	return MAP_DESC_STRINGS.reduce((meta, key) => {
 		if (!mapInfo.map[key]) return meta;
 		const index = parseInt(mapInfo.map[key].slice(8));
@@ -388,21 +426,46 @@ function qHasCachedProto() {
 	}
 }
 
+function getChecksum(folder) {
+  try {
+    return fs.readFileSync(path.resolve(folder, 'checksum.txt'), 'utf8').trim();
+  } catch (err) {
+    if (err.code === 'ENOENT') return undefined;
+    throw err;
+  }
+}
+
 function cacheProtoHash() {
 	const dirpath = path.dirname(PROTO_FILE_PATH);
 	return fs.writeFileSync(path.resolve(dirpath, 'checksum.txt'), getMapHash(PROTO_FILE_PATH));
 }
 
 function getAMAIVersion() {
-	const amaiBinPath = execSync(`where amai`).toString('utf8').trim();
+	const amaiBinPath = execSync(`where MakeTFT`).toString('utf8').trim();
 	const amaiFolder = path.dirname(amaiBinPath);
-	const localVersion = execSync(`git rev-parse head`, {cwd: amaiFolder}).toString('utf8').trim();
-	if (localVersion !== fs.readFileSync(path.resolve(amaiFolder, 'checksum.txt'), 'utf8').trim()) {
+	const localBranch = execSync(`git rev-parse --abbrev-ref head`, {cwd: amaiFolder}).toString('utf8').trim();
+	const localCommit = execSync(`git rev-parse head`, {cwd: amaiFolder}).toString('utf8').trim();
+	if (localCommit !== getChecksum(amaiFolder)) {
+		const amaiResult = spawnSync(`MakeTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
+		assert.strictEqual(localCommit, getChecksum(amaiFolder));
 		spawnSync(`MakeOptTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
-		assert.strictEqual(localVersion, fs.readFileSync(path.resolve(amaiFolder, 'checksum.txt'), 'utf8').trim());
+		assert.strictEqual(localCommit, getChecksum(amaiFolder));
 	}
-	const upstreamVersion = execSync(`git rev-parse 2.6.x-zh~3`, {cwd: amaiFolder}).toString('utf8').trim();
-	return {private: localVersion, public: upstreamVersion};
+	const refToPublicCommit = localBranch === 'tree-refactor' ? `official` : `2.6.x-zh~3`;
+	const upstreamVersion = execSync(`git rev-parse ${refToPublicCommit}`, {cwd: amaiFolder}).toString('utf8').trim();
+	return {
+		branch: localBranch,
+		brand: localBranch === 'tree-refactor' || localBranch.startsWith('3.3.x') ? '|cffffcc003.3.0|r' : '|cffffcc002.6.2|r',
+		private: localCommit,
+		public: upstreamVersion,
+	};
+}
+
+let cachedExtraListFiles = undefined;
+function getSlkExtraListFiles() {
+	if (cachedExtraListFiles !== undefined) return cachedExtraListFiles;
+	cachedExtraListFiles = fs.readFileSync(path.resolve(__dirname, 'listfile_slk.txt'), 'utf8');
+	return cachedExtraListFiles;
 }
 
 function removeVowels(input) {
@@ -460,8 +523,10 @@ module.exports = {
 	deepClone,
 	logOnce,
 	parseWar, writeWar, isMapFileName,
-	batchExtract, batchAdapt, getMapDescStrings,
+	batchExtract, batchAdapt,
+	getMapInfo, getMapDescStrings,
 	getDate, getAMAIVersion,
+	getSlkExtraListFiles,
 	brandMap, coloredHash, coloredShortHash, coloredString,
 	getMapHash, qHasCachedProto, cacheProtoHash,
 
