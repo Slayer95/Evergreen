@@ -422,14 +422,16 @@ function updateMapHashes(wc3_data_path, sub_folder) {
 	}
 	const mapNames = fs.readdirSync(outFolder).filter(isMapFileName);
 	if (!mapNames.length) return console.error(`No maps generated at ${outFolder}.`);
+  let version;
 	const hashes = new Map();
 	for (const fileName of mapNames) {
+    version = /(\d+[a-z]+)\.w3x$/.exec(fileName)[1];
 		hashes.set(fileName, getMapHash(path.resolve(outFolder, fileName)));
 	}
 	const hashList = Array.from(hashes).map(tuple => tuple.join(','));
 	hashList.unshift('Map,SHA256');
 	hashList.push('');
-	fs.writeFileSync(path.resolve(outFolder, 'hashes.csv'), hashList.join('\n'));
+	fs.writeFileSync(path.resolve(outFolder, `evergreen${version}-hashes.csv`), hashList.join('\n'));
 }
 
 function runUpdate(opts) {
@@ -536,18 +538,18 @@ function runMain(mapSet, suffix = '') {
 let t = process.hrtime();
 let errors = [];
 try {
-	runMain(1, '-N');
+	runMain(1, '');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
 try {
-	runMain(0, '-N');
+	runMain(0, '');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
-runAttachCommander('-N');
+runAttachCommander('');
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);

@@ -455,7 +455,7 @@ function getAMAIVersion() {
 	const upstreamVersion = execSync(`git rev-parse ${refToPublicCommit}`, {cwd: amaiFolder}).toString('utf8').trim();
 	return {
 		branch: localBranch,
-		brand: localBranch === 'tree-refactor' || localBranch.startsWith('3.3.x') ? '|cffffcc003.3.0|r' : '|cffffcc002.6.2|r',
+		brand: localBranch === 'tree-refactor' || localBranch === 'tree-refactor-2' || localBranch.startsWith('3.3.x') ? '|cffffcc003.3.1a|r' : '|cffffcc002.6.2|r',
 		private: localCommit,
 		public: upstreamVersion,
 	};

@@ -147,11 +147,11 @@ function insertMeta(jassCode, meleeMeta, evergreenMeta) {
 	jassCode = jassCode.replace(/Map Author: [^\n]+/, `Map Author: ${author}`);
 
 	/* Hashtables */
-	jassCode = jassCode.replace(/\/\/ BEGIN udg_RFObjectCost(.*)\/\/ END udg_RFObjectCost/s, objectCostsToSource());
-	jassCode = jassCode.replace(/\/\/ BEGIN udg_RFSunderingUnits(.*)\/\/ END udg_RFSunderingUnits/s, sunderingUnitsToSource());
+	jassCode = jassCode.replace(/ *\/\/ BEGIN udg_RFObjectCost(.*)\/\/ END udg_RFObjectCost/s, objectCostsToSource());
+	jassCode = jassCode.replace(/ *\/\/ BEGIN udg_RFSunderingUnits(.*)\/\/ END udg_RFSunderingUnits/s, sunderingUnitsToSource());
 	/*jassCode = jassCode.replace(/\/\/ BEGIN udg_RFMeleeUnits(.*)\/\/ END udg_RFMeleeUnits/s, meleeUnitsToSource());*/
-	jassCode = jassCode.replace(/\/\/ BEGIN udg_RFHeroAbilities(.*)\/\/ END udg_RFHeroAbilities/s, heroAbilitiesToSource());
-	jassCode = jassCode.replace(/\/\/ BEGIN udg_RFUnitButtons(.*)\/\/ END udg_RFUnitButtons/s, unitButtonsToSource());
+	jassCode = jassCode.replace(/ *\/\/ BEGIN udg_RFHeroAbilities(.*)\/\/ END udg_RFHeroAbilities/s, heroAbilitiesToSource());
+	jassCode = jassCode.replace(/ *\/\/ BEGIN udg_RFUnitButtons(.*)\/\/ END udg_RFUnitButtons/s, unitButtonsToSource());
 	return jassCode;
 }
 
