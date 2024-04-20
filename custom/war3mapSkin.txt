@@ -1,3 +1,6 @@
+[CustomSkin]
+Cursor=UI\Cursor\UndeadCursor.mdl
+
 [FrameDef]
 QUESTSMAIN=About
 QUESTSOPTIONAL=Optional
