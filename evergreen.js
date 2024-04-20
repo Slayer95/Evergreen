@@ -150,6 +150,7 @@ function mergeUpstreamIntoCopies(willOpt) {
 
 		// Update info
 		const mapInfo = deepClone(protoInfo);
+		mapInfo.editorVersion = Math.min(mapInfo.editorVersion, 6059);
 		mapInfo.camera = deepClone(upstreamMapInfo.camera);
 		mapInfo.players = deepClone(upstreamMapInfo.players);
 		for (const player of mapInfo.players) {
@@ -524,8 +525,8 @@ function runMain(mapSet, suffix = '') {
 		adaptSeasonalMaps: true, /* ignored if cached */
 		useCachedBackports: false, // false
 		installAI: true, // true
-		optimize: true, // true
-		useZopfli: true, // false
+		optimize: false, // true
+		useZopfli: false, // false
 		deploy: true,
 		deployPath: {
 			prune: true,
@@ -538,18 +539,18 @@ function runMain(mapSet, suffix = '') {
 let t = process.hrtime();
 let errors = [];
 try {
-	runMain(1, '');
+	runMain(1, '-Test');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
 try {
-	runMain(0, '');
+	runMain(0, '-Test');
 } catch (err) {
 	errors.push(err);
 	console.error(err.message);
 }
-runAttachCommander('');
+runAttachCommander('-Test');
 t = process.hrtime(t);
 
 console.log(`Done in ${t[0]} seconds.`);
