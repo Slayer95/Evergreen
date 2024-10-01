@@ -10,6 +10,10 @@ const CsvReadableStream = require('csv-reader');
 const {pipeline} = require('stream/promises');
 const {Transform} = require('stream');
 
+const {
+  dataDir,
+} = require('./shared');
+
 const outPath = path.resolve(__dirname, 'costs.json');
 const ID_KEYS = new Map([
 	['AbilityData', 'alias'],
@@ -18,9 +22,10 @@ const ID_KEYS = new Map([
 	['ItemData', 'itemID'],
 	['UnitBalance', 'unitBalanceID'],
 	['UnitData', 'unitID'],
+  //UnitFunc handled by data-ini2json
 	['UnitWeapons', 'unitWeapID'],
 	['UpgradeData', 'upgradeid'],
-]);
+].map(tuple => [tuple[0].toLowerCase(), tuple[1]]));
 
 const SPECIAL_VALUES = new Map([
 	['SYLK_TRUE', true],
@@ -49,13 +54,14 @@ function readCsv(filePath) {
 }
 
 async function getConsolidatedOfType(type) {
+  // war3.mpq, war3x.mpq, war3Patch.mpq, prototype.w3x
 	const files = [`${type}.csv`, `x${type}.csv`, `p${type}.csv`, `q${type}.csv`];
 	const merged = new Map();
 	const idKey = ID_KEYS.get(type);
 	for (const fileName of files) {
-		if (!fs.existsSync(path.resolve(__dirname, 'data', fileName))) continue;
+		if (!fs.existsSync(path.resolve(dataDir, fileName))) continue;
 		await new Promise((resolve, reject) => {
-			fs.createReadStream(path.resolve(__dirname, 'data', fileName), 'utf8')
+			fs.createReadStream(path.resolve(dataDir, fileName), 'utf8')
 			.pipe(new CsvReadableStream({asObject: true, parseNumbers: true}))
 			.on('data', (entry) => {
 				if (!(idKey in entry)) throw new Error(`Malformed entry "${JSON.stringify(entry)}"`);
@@ -84,11 +90,11 @@ async function getConsolidatedOfType(type) {
 	return merged;
 }
 
-async function main() {
+async function run() {
 	const types = new Set(
-		fs.readdirSync(path.resolve(__dirname, 'data'))
-		.filter(name => name.charAt(0) === name.charAt(0).toUpperCase())
-		.map(name => name.slice(0, -path.extname(name).length))
+		fs.readdirSync(dataDir)
+		.filter(name => name.charAt(0) != 'p' && name.charAt(0) != 'q' && name.charAt(0) != 'x')
+		.map(name => name.slice(0, -path.extname(name).length).toLowerCase())
 	);
 	for (const type of types) {
 		if (!ID_KEYS.has(type)) {
@@ -97,8 +103,10 @@ async function main() {
 		}
 		console.log(`Merging ${type}...`);
 		const consolidated = await getConsolidatedOfType(type);
-		fs.writeFileSync(path.resolve(__dirname, 'data', `${type}.json`), JSON.stringify(Array.from(consolidated)));
+		fs.writeFileSync(path.resolve(dataDir, `${type}.json`), JSON.stringify(Array.from(consolidated)));
 	}
 }
 
-main();
+module.exports = {
+  run,
+};

@@ -6,6 +6,7 @@ const UnitData = new Map(require('./data/UnitData.json'));
 const UnitWeapons = new Map(require('./data/UnitWeapons.json'));
 const UpgradeData = new Map(require('./data/UpgradeData.json'));
 const UnitFunc = new Map(require('./data/UnitFunc.json'));
+const UnitStrings = new Map(require('./data/UnitStrings.json'));
 
 function objectCostsToSource() {
 	let output = [];
@@ -22,6 +23,30 @@ function objectCostsToSource() {
 		if (lumberbase) output.push(`call SaveInteger(udg_RFObjectCost, 1, '${id}', ${lumberbase})`);
 		if (goldmod) output.push(`call SaveInteger(udg_RFObjectCost, 2, '${id}', ${goldmod})`);
 		if (lumbermod) output.push(`call SaveInteger(udg_RFObjectCost, 3, '${id}', ${lumbermod})`);
+	}
+	return output.map((x, i) => i ? ` `.repeat(4) + x : x).join(`\r\n`);
+}
+
+function objectNamesToSource() {
+	let output = [];
+  let openingUnits = new Set([
+    'hfoo', 'hrif', 'ogru', 'ohun',
+    'ugho', 'ucry', 'earc', 'esen',
+  ]);
+	for (const [id, {Name}] of UnitStrings) {
+    if (!Name) continue;
+    let targetType = UnitData.get(id)?.targType;
+    let race = UnitData.get(id)?.race;
+    let classification = UnitData.get(id)?.type;
+    let defType = UnitBalance.get(id)?.defType;
+    if (id[0] === 'R' || id === 'ugol' || id === 'egol' || targetType === 'structure' || defType === 'hero' ||
+      classification?.includes('TownHall') || classification?.includes('Peon') || openingUnits.has(id) ||
+      race === 'human' || race === 'undead' || race === 'nightelf' || race === 'orc') {
+      let names = Name.split(',');
+      for (let i = 0; i < names.length; i++) {
+        output.push(`call SaveStringBJ(${JSON.stringify(names[i])}, '${id}', ${i}, udg_RFObjectName)`);
+      }
+    }
 	}
 	return output.map((x, i) => i ? ` `.repeat(4) + x : x).join(`\r\n`);
 }
@@ -63,7 +88,7 @@ function heroAbilitiesToSource() {
 
 function unitButtonsToSource() {
 	let output = [];
-	for (const [id, {Art}] of UnitFunc) {
+	for (const [id, {Art}] of UnitStrings) {
 		if (Art) {
 			output.push(`call SaveStringBJ(${JSON.stringify(Art)}, '${id}', 0, udg_RFUnitButtons)`);
 		}
@@ -83,6 +108,7 @@ function cached(fn) {
 
 module.exports = {
 	objectCostsToSource: cached(objectCostsToSource),
+	objectNamesToSource: cached(objectNamesToSource),
 	sunderingUnitsToSource: cached(sunderingUnitsToSource),
 	meleeUnitsToSource: cached(meleeUnitsToSource),
 	heroAbilitiesToSource: cached(heroAbilitiesToSource),

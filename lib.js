@@ -28,6 +28,7 @@ const {
 } = require('./shared');
 
 const DataExists = {
+  // These files are lists of all existing FourCC codes.
 	Doodads: new Set((fs.readFileSync('./data/Doodads.txt', 'utf8') + '\n' + fs.readFileSync('./data/Destructables.txt', 'utf8')).split(/\r?\n/).map(x => x.trim()).filter(x => x)),
 	Items: new Set(fs.readFileSync('./data/Items.txt', 'utf8').split(/\r?\n/).map(x => x.trim()).filter(x => x)),
 	Units: new Set(fs.readFileSync('./data/Units.txt', 'utf8').split(/\r?\n/).map(x => x.trim()).filter(x => x)),
@@ -307,7 +308,6 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
 		} catch (err) {
 			if (!allowFallback) throw err;
-			console.error(err.stack);
 			const fbPath = path.resolve(getAltSourceFolder(rootPath), outFolder, 'war3map.doo');
 			console.error(`File does not meet ${mode} spec: ${doodadsPath}`);
 			console.error(`Falling back to ${mode === 'latest' ? 'legacy' : 'latest'}: ${fbPath}\n`);
@@ -319,7 +319,6 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			units = parseWar(mode === 'legacy' ? UnitsLegacy : UnitsLatest, unitsPath);
 		} catch (err) {
 			if (!allowFallback) throw err;
-			console.error(err.stack);
 			const fbPath = path.resolve(getAltSourceFolder(rootPath), outFolder, 'war3mapUnits.doo');
 			console.error(`File does not meet ${mode} spec: ${unitsPath}`);
 			console.error(`Falling back to ${mode === 'latest' ? 'legacy' : 'latest'}: ${fbPath}\n`);
@@ -362,31 +361,26 @@ function getMapInfo(folder, allowFallback = true) {
 	try {
 		mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
 	} catch (err) {
-		if (!allowFallback) throw err
-		console.error(err.stack);
+		if (!allowFallback) throw err;
+    console.error(`File does not meet latest spec: ${path.resolve(folder, 'war3map.w3i')}`);
 		mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
-		console.error('Fallback OK');
+		console.error('Fallback OK (w3i)');
 	}
 	return mapInfo;
 }
 
-function getMapDescStrings(folder, allowFallback = true) {
-	let mapInfo;
+function getMapDescStrings(folder, mapInfo, allowFallback = true) {
 	let strings;
-	try {
-		mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
-	} catch (err) {
-		if (!allowFallback) throw err;
-		mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
-		console.error('Fallback OK');
-	}
+  if (!mapInfo) {
+    mapInfo = getMapInfo(folder, allowFallback);
+  }
 	try {
 		strings = parseWar(StringsLatest, path.resolve(folder, 'war3map.wts'));
 	} catch (err) {
 		if (!allowFallback) throw err;
-		console.error(err.stack);
+		console.error(`File does not meet latest spec: ${path.resolve(folder, 'war3map.wts')}`);
 		strings = parseWar(StringsLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.wts'));
-		console.error('Fallback OK');
+		console.error('Fallback OK (wts)');
 	}
 	return MAP_DESC_STRINGS.reduce((meta, key) => {
 		if (!mapInfo.map[key]) return meta;
@@ -451,11 +445,11 @@ function getAMAIVersion() {
 		spawnSync(`MakeOptTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
 		assert.strictEqual(localCommit, getChecksum(amaiFolder));
 	}
-	const refToPublicCommit = localBranch === 'tree-refactor' ? `official` : `2.6.x-zh~3`;
+	const refToPublicCommit = localBranch.startsWith('2.6.x') ? `2.6.x-zh~3` : `official`;
 	const upstreamVersion = execSync(`git rev-parse ${refToPublicCommit}`, {cwd: amaiFolder}).toString('utf8').trim();
 	return {
 		branch: localBranch,
-		brand: localBranch === 'tree-refactor' || localBranch === 'tree-refactor-2' || localBranch.startsWith('3.3.x') ? '|cffffcc003.3.1a|r' : '|cffffcc002.6.2|r',
+		brand: localBranch.startsWith('2.6.x') ? '|cffffcc002.6.2|r' : '|cffffcc003.3.5a|r',
 		private: localCommit,
 		public: upstreamVersion,
 	};
@@ -514,6 +508,14 @@ function delFolders(rootDirs, options = {}) {
 	return true;
 }
 
+async function anyKeyPress() {
+  process.stdin.setRawMode(true)
+  return new Promise(resolve => process.stdin.once('data', () => {
+    process.stdin.setRawMode(false)
+    resolve()
+  }))
+}
+
 module.exports = {
 	DoodadsLegacy, InfoLegacy, UnitsLegacy, StringsLegacy,
 	DoodadsLatest, InfoLatest, UnitsLatest, StringsLatest,
@@ -532,4 +534,6 @@ module.exports = {
 
 	exists, replacements, tryReplaceUnit,
 	copyFileSync,
+
+  anyKeyPress,
 };
