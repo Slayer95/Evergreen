@@ -11,7 +11,7 @@ const {pipeline} = require('stream/promises');
 const {Transform} = require('stream');
 
 const {
-  dataDir,
+	dataDir,
 } = require('./shared');
 
 const outPath = path.resolve(__dirname, 'costs.json');
@@ -22,7 +22,7 @@ const ID_KEYS = new Map([
 	['ItemData', 'itemID'],
 	['UnitBalance', 'unitBalanceID'],
 	['UnitData', 'unitID'],
-  //UnitFunc handled by data-ini2json
+	//UnitFunc handled by data-ini2json
 	['UnitWeapons', 'unitWeapID'],
 	['UpgradeData', 'upgradeid'],
 ].map(tuple => [tuple[0].toLowerCase(), tuple[1]]));
@@ -54,7 +54,7 @@ function readCsv(filePath) {
 }
 
 async function getConsolidatedOfType(type) {
-  // war3.mpq, war3x.mpq, war3Patch.mpq, prototype.w3x
+	// war3.mpq, war3x.mpq, war3Patch.mpq, prototype.w3x
 	const files = [`${type}.csv`, `x${type}.csv`, `p${type}.csv`, `q${type}.csv`];
 	const merged = new Map();
 	const idKey = ID_KEYS.get(type);
@@ -108,5 +108,5 @@ async function run() {
 }
 
 module.exports = {
-  run,
+	run,
 };

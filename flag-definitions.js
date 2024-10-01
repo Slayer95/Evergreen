@@ -29,24 +29,24 @@ function objectCostsToSource() {
 
 function objectNamesToSource() {
 	let output = [];
-  let openingUnits = new Set([
-    'hfoo', 'hrif', 'ogru', 'ohun',
-    'ugho', 'ucry', 'earc', 'esen',
-  ]);
+	let openingUnits = new Set([
+		'hfoo', 'hrif', 'ogru', 'ohun',
+		'ugho', 'ucry', 'earc', 'esen',
+	]);
 	for (const [id, {Name}] of UnitStrings) {
-    if (!Name) continue;
-    let targetType = UnitData.get(id)?.targType;
-    let race = UnitData.get(id)?.race;
-    let classification = UnitData.get(id)?.type;
-    let defType = UnitBalance.get(id)?.defType;
-    if (id[0] === 'R' || id === 'ugol' || id === 'egol' || targetType === 'structure' || defType === 'hero' ||
-      classification?.includes('TownHall') || classification?.includes('Peon') || openingUnits.has(id) ||
-      race === 'human' || race === 'undead' || race === 'nightelf' || race === 'orc') {
-      let names = Name.split(',');
-      for (let i = 0; i < names.length; i++) {
-        output.push(`call SaveStringBJ(${JSON.stringify(names[i])}, '${id}', ${i}, udg_RFObjectName)`);
-      }
-    }
+		if (!Name) continue;
+		let targetType = UnitData.get(id)?.targType;
+		let race = UnitData.get(id)?.race;
+		let classification = UnitData.get(id)?.type;
+		let defType = UnitBalance.get(id)?.defType;
+		if (id[0] === 'R' || id === 'ugol' || id === 'egol' || targetType === 'structure' || defType === 'hero' ||
+			classification?.includes('TownHall') || classification?.includes('Peon') || openingUnits.has(id) ||
+			race === 'human' || race === 'undead' || race === 'nightelf' || race === 'orc') {
+			let names = Name.split(',');
+			for (let i = 0; i < names.length; i++) {
+				output.push(`call SaveStringBJ(${JSON.stringify(names[i])}, '${id}', ${i}, udg_RFObjectName)`);
+			}
+		}
 	}
 	return output.map((x, i) => i ? ` `.repeat(4) + x : x).join(`\r\n`);
 }

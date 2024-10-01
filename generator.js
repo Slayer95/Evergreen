@@ -3,11 +3,11 @@
 const {LUA_SOURCE} = require('./shared');
 const {exists, tryReplaceUnit, float, quote, coloredHash} = require('./lib');
 const {
-  objectCostsToSource,
-  objectNamesToSource,
-  sunderingUnitsToSource,
-  heroAbilitiesToSource,
-  unitButtonsToSource,
+	objectCostsToSource,
+	objectNamesToSource,
+	sunderingUnitsToSource,
+	heroAbilitiesToSource,
+	unitButtonsToSource,
 } = require('./flag-definitions');
 
 const invalidPatterns = [
@@ -140,7 +140,7 @@ function insertMeta(jassCode, meleeMeta, evergreenMeta) {
 	const {hash: meleeHash, editorVersion: meleeEditorVersion, texts: meleeTexts} = meleeMeta;
 	const {author, date, generator, version, language, AMAIVersion} = evergreenMeta;
 	const questMapCreditsText = `|cffffcc00${meleeTexts.name}|r is a map made by |cffffcc00${meleeTexts.author}|r.`
-  const localizationText = `- |cffffcc00${language}|r localization.`;
+	const localizationText = `- |cffffcc00${language}|r localization.`;
 
 /*
 See also common.eai
@@ -148,14 +148,14 @@ See also common.eai
 // (AMAI)  General Stuff
 //==============================================================
 	boolean IsAMAI = false
-    boolean leadally = false
+	boolean leadally = false
 	
 	boolean campaign_ai = false
 
-    string language = "Spanish"
+	string language = "Spanish"
 */
 
-  jassCode = jassCode.replace(/(set udg_MetaTextQuestAuthor\[5\] = )"[^"]+"/, `$1"${localizationText}"`);
+	jassCode = jassCode.replace(/(set udg_MetaTextQuestAuthor\[5\] = )"[^"]+"/, `$1"${localizationText}"`);
 	jassCode = jassCode.replace(/(set udg_MetaTextQuestCredits\[1\] = )"[^"]+"/, `$1"${questMapCreditsText}"`);
 	jassCode = jassCode.replace(/(set udg_MetaTextQuestCredits\[2\] = )"[^"]+"/, `$1"|cff32cd32Project Evergreen|r |cffffcc00v${version.split(' ').at(-1)}|r includes:"`);
 	jassCode = jassCode.replace(/(set udg_MetaTextQuestCredits\[10\] = )"[^"]+"/, `$1"|cffffcc00${meleeTexts.name}|r's (WorldEdit version |cffffcc00${meleeEditorVersion}|r) hash (|cff4682b4sha256|r):"`);
@@ -240,7 +240,7 @@ function removeDeadCode(jassCode) {
 }
 
 function insertMMDDeps(jassCode) {
-  jassCode += (`
+	jassCode += (`
 //Struct method generated initializers/callers:
 function sa__MMD__QueueNode_onDestroy takes nothing returns boolean
 local integer this=f__arg_this
@@ -259,13 +259,13 @@ function jasshelper__initstructs33761985 takes nothing returns nothing
 
 endfunction
 `
-  );
-  return jassCode;
+	);
+	return jassCode;
 }
 
 function insertMMDLibrary(jassCode) {
 
-  let transpiledVJassCodeLibrary = (
+	let transpiledVJassCodeLibrary = (
 `//Generated method caller for MMD__QueueNode.onDestroy
 function sc__MMD__QueueNode_onDestroy takes integer this returns nothing
             call FlushStoredInteger(MMD__gc, MMD__M_KEY_VAL + s__MMD__QueueNode_key[this], s__MMD__QueueNode_msg[this])
@@ -623,7 +623,7 @@ endfunction
         set i=0
         loop
             exitwhen i >= udg_RFMaxPlayerIndex
-            p = Player(i)
+            set p = Player(i)
             if GetPlayerSlotState(p) == PLAYER_SLOT_STATE_PLAYING then
                 if GetPlayerController(p) == MAP_CONTROL_USER then
                   call MMD__emit("init pid " + I2S(i) + " " + MMD__pack(GetPlayerName(p)))
@@ -770,14 +770,14 @@ endfunction
 `);
 
 	jassCode = jassCode.replace(/ *\/\/ BEGIN MMD LIBRARY(.*)\/\/ END MMD LIBRARY/s, transpiledVJassCodeLibrary);
-  jassCode = jassCode.replace(/ *\/\/ BEGIN MMD API(.*)\/\/ END MMD API/s, transpiledVJassCodeAPI);
-  jassCode = jassCode.replace(`    call InitGlobals(  )`, 
+	jassCode = jassCode.replace(/ *\/\/ BEGIN MMD API(.*)\/\/ END MMD API/s, transpiledVJassCodeAPI);
+	jassCode = jassCode.replace(`    call InitGlobals(  )`, 
 `    call ExecuteFunc( "jasshelper__initstructs33761985" )
     call ExecuteFunc( "MMD__init" )
     call InitGlobals(  )`
   );
 
-  return jassCode;
+	return jassCode;
 }
 
 function lintJass(jassCode) {
@@ -788,21 +788,21 @@ function lintJass(jassCode) {
 		}
 	}
 	jassCode = removeDeadCode(jassCode);
-  // Readability optimization
+	// Readability optimization
 	jassCode = jassCode.replace(/\( GetConvertedPlayerId\(([a-zA-Z0-9_ \(\)]+)\) \- 1 \)/g, `( GetPlayerId($1) )`),
 
-  // Transpilation
-  jassCode = jassCode.replace(/"EVAL\(([^\n]+)\)"/g, '$1');
+	// Transpilation
+	jassCode = jassCode.replace(/"EVAL\(([^\n]+)\)"/g, '$1');
 	jassCode = jassCode.replace(/GetPlayerName\([^\n]+\) == "WorldEdit"/g, `false`);
 	jassCode = jassCode.replace(/GetUnitName\(([a-zA-Z0-9_-]+(?:\(\))?)\)/, `LoadStringBJ(GetUnitTypeId($1), 0, udg_RFObjectName)`);
 	jassCode = jassCode.replace(/GetObjectName\(([a-zA-Z0-9_-]+(?:\(\))?)\)/, `LoadStringBJ(GetUnitTypeId($1), 0, udg_RFObjectName)`);
 
-  // Readability
-  jassCode = jassCode.replace(/call MMD_DefineValue\(([^\n]+), 101, 101, 103 \)/g, `call MMD_DefineValue($1, MMD_TYPE_STRING, MMD_GOAL_NONE, MMD_SUGGEST_LEADERBOARD)`);
-  jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )101\)/g, `call MMD_FlagPlayer($1MMD_FLAG_DRAWER)`);
+	// Readability
+	jassCode = jassCode.replace(/call MMD_DefineValue\(([^\n]+), 101, 101, 103 \)/g, `call MMD_DefineValue($1, MMD_TYPE_STRING, MMD_GOAL_NONE, MMD_SUGGEST_LEADERBOARD)`);
+	jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )101\)/g, `call MMD_FlagPlayer($1MMD_FLAG_DRAWER)`);
 	jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )102\)/g, `call MMD_FlagPlayer($1MMD_FLAG_LOSER)`);
-  jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )103\)/g, `call MMD_FlagPlayer($1MMD_FLAG_WINNER)`);
-  jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )104\)/g, `call MMD_FlagPlayer($1MMD_FLAG_LEAVER)`);
+	jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )103\)/g, `call MMD_FlagPlayer($1MMD_FLAG_WINNER)`);
+	jassCode = jassCode.replace(/call MMD_FlagPlayer\(([^\n]+ = )104\)/g, `call MMD_FlagPlayer($1MMD_FLAG_LEAVER)`);
 
 	/*
 	let codeCoordinate = 0;

@@ -28,7 +28,7 @@ const {
 } = require('./shared');
 
 const DataExists = {
-  // These files are lists of all existing FourCC codes.
+	// These files are lists of all existing FourCC codes.
 	Doodads: new Set((fs.readFileSync('./data/Doodads.txt', 'utf8') + '\n' + fs.readFileSync('./data/Destructables.txt', 'utf8')).split(/\r?\n/).map(x => x.trim()).filter(x => x)),
 	Items: new Set(fs.readFileSync('./data/Items.txt', 'utf8').split(/\r?\n/).map(x => x.trim()).filter(x => x)),
 	Units: new Set(fs.readFileSync('./data/Units.txt', 'utf8').split(/\r?\n/).map(x => x.trim()).filter(x => x)),
@@ -347,7 +347,7 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			console.log(`${doodads.length - validDoodads.length} doodads(${Array.from(invalidDoodadTypes).sort()}) deleted from ${mapFile}`);
 		}
 		if (validUnits.length !== units.length) {
-			console.log(`${units.length - validUnits.length} units(${Array.from(invalidUnitTypes).sort()})  deleted from ${mapFile}`);
+			console.log(`${units.length - validUnits.length} units(${Array.from(invalidUnitTypes).sort()})	deleted from ${mapFile}`);
 		}
 		const outDoodadsPath = path.resolve(rewriteFolder, outFolder, 'war3map.doo');
 		const outUnitsPath = path.resolve(rewriteFolder, outFolder, 'war3mapUnits.doo');
@@ -362,7 +362,7 @@ function getMapInfo(folder, allowFallback = true) {
 		mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
 	} catch (err) {
 		if (!allowFallback) throw err;
-    console.error(`File does not meet latest spec: ${path.resolve(folder, 'war3map.w3i')}`);
+		console.error(`File does not meet latest spec: ${path.resolve(folder, 'war3map.w3i')}`);
 		mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
 		console.error('Fallback OK (w3i)');
 	}
@@ -371,9 +371,9 @@ function getMapInfo(folder, allowFallback = true) {
 
 function getMapDescStrings(folder, mapInfo, allowFallback = true) {
 	let strings;
-  if (!mapInfo) {
-    mapInfo = getMapInfo(folder, allowFallback);
-  }
+	if (!mapInfo) {
+		mapInfo = getMapInfo(folder, allowFallback);
+	}
 	try {
 		strings = parseWar(StringsLatest, path.resolve(folder, 'war3map.wts'));
 	} catch (err) {
@@ -421,12 +421,12 @@ function qHasCachedProto() {
 }
 
 function getChecksum(folder) {
-  try {
-    return fs.readFileSync(path.resolve(folder, 'checksum.txt'), 'utf8').trim();
-  } catch (err) {
-    if (err.code === 'ENOENT') return undefined;
-    throw err;
-  }
+	try {
+		return fs.readFileSync(path.resolve(folder, 'checksum.txt'), 'utf8').trim();
+	} catch (err) {
+		if (err.code === 'ENOENT') return undefined;
+		throw err;
+	}
 }
 
 function cacheProtoHash() {
@@ -509,11 +509,11 @@ function delFolders(rootDirs, options = {}) {
 }
 
 async function anyKeyPress() {
-  process.stdin.setRawMode(true)
-  return new Promise(resolve => process.stdin.once('data', () => {
-    process.stdin.setRawMode(false)
-    resolve()
-  }))
+	process.stdin.setRawMode(true)
+	return new Promise(resolve => process.stdin.once('data', () => {
+		process.stdin.setRawMode(false)
+		resolve()
+	}))
 }
 
 module.exports = {
@@ -535,5 +535,5 @@ module.exports = {
 	exists, replacements, tryReplaceUnit,
 	copyFileSync,
 
-  anyKeyPress,
+	anyKeyPress,
 };

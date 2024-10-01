@@ -24,14 +24,14 @@ const {
 	getAMAIVersion,
 	getSlkExtraListFiles,
 
-  anyKeyPress,
+	anyKeyPress,
 } = require('./lib');
 
 const {
 	protoDir,
 	protoObjDir,
-  protoSlkDir,
-  dataDir,
+	protoSlkDir,
+	dataDir,
 	customDir, // additional files for maps
 	upstreamDirs,
 	adaptedDirs,
@@ -49,11 +49,11 @@ const {
 
 const {
 	insertMeta,
-  insertMMDLibrary,
-  insertMMDGlobals,
-  insertMMDDeps,
+	insertMMDLibrary,
+	insertMMDGlobals,
+	insertMMDDeps,
 	lintJass,
-  mergeMaxPlayers,
+	mergeMaxPlayers,
 	mergeGlobals,
 	mergeInitialization,
 } = require('./generator');
@@ -64,52 +64,52 @@ const JSONFromUnitFunc = require('./data-ini2json');
 const releaseMapNames = new Map();
 
 async function extractProto() {
-  const protoFileName = path.relative(protoDir, PROTO_FILE_PATH);
-  console.log(`${protoFileName} is new version`);
+	const protoFileName = path.relative(protoDir, PROTO_FILE_PATH);
+	console.log(`${protoFileName} is new version`);
 
-  try {
-    fs.mkdirSync(protoObjDir);
-    fs.mkdirSync(protoSlkDir);
-  } catch (err) {
-    if (err.code != 'EEXIST') throw err;
-  }
+	try {
+		fs.mkdirSync(protoObjDir);
+		fs.mkdirSync(protoSlkDir);
+	} catch (err) {
+		if (err.code != 'EEXIST') throw err;
+	}
 	delFolders([protoObjDir, protoSlkDir]);
 
-  console.log(`\n`);
-  console.log(`########################`);
-  console.log(`# Data extraction      #`);
-  console.log(`########################`);
+	console.log(`\n`);
+	console.log(`########################`);
+	console.log(`# Data extraction			#`);
+	console.log(`########################`);
 
-  spawnSync(`MPQEditor`, [`extract`, protoFileName, `*`, path.relative(protoDir, protoObjDir), `/fp`], {cwd: protoDir});
-  spawnSync(`w2l.exe`, [`slk`, PROTO_FILE_PATH], {cwd: protoDir, stdio: 'inherit'});
+	spawnSync(`MPQEditor`, [`extract`, protoFileName, `*`, path.relative(protoDir, protoObjDir), `/fp`], {cwd: protoDir});
+	spawnSync(`w2l.exe`, [`slk`, PROTO_FILE_PATH], {cwd: protoDir, stdio: 'inherit'});
 
-  const PROTO_SLK_FILE_PATH = PROTO_FILE_PATH.slice(0, -4) + `_slk.w3x`;
-  fs.copyFileSync(path.resolve(protoObjDir, `(listfile)`), path.resolve(protoDir, `listfile-slk.txt`));
-  fs.appendFileSync(path.resolve(protoDir, `listfile-slk.txt`), getSlkExtraListFiles());
+	const PROTO_SLK_FILE_PATH = PROTO_FILE_PATH.slice(0, -4) + `_slk.w3x`;
+	fs.copyFileSync(path.resolve(protoObjDir, `(listfile)`), path.resolve(protoDir, `listfile-slk.txt`));
+	fs.appendFileSync(path.resolve(protoDir, `listfile-slk.txt`), getSlkExtraListFiles());
 
-  console.log(`!! This step needs manual intervention !!`);
-  console.log(`!! Please add the \`listfile-slk.txt\` file to ${PROTO_SLK_FILE_PATH} !!`);
-  console.log(`!! Afterwards, extract contents of units in the MPQ archive to ${protoSlkDir} !!`);
-  console.log(`!! Press any key to continue !!`);
+	console.log(`!! This step needs manual intervention !!`);
+	console.log(`!! Please add the \`listfile-slk.txt\` file to ${PROTO_SLK_FILE_PATH} !!`);
+	console.log(`!! Afterwards, extract contents of units in the MPQ archive to ${protoSlkDir} !!`);
+	console.log(`!! Press any key to continue !!`);
 
-  await anyKeyPress();
+	await anyKeyPress();
 
-  console.log(`Resuming...`);
-  const extractedIniFiles = fs.readdirSync(protoSlkDir);
-  if (!extractedIniFiles.length) {
-    throw new Error(`Folder ${protoSlkDir} is empty.`);
-  }
+	console.log(`Resuming...`);
+	const extractedIniFiles = fs.readdirSync(protoSlkDir);
+	if (!extractedIniFiles.length) {
+		throw new Error(`Folder ${protoSlkDir} is empty.`);
+	}
 
-  for (const fileName of extractedIniFiles) {
-    fs.copyFileSync(
-      path.resolve(protoSlkDir, fileName),
-      path.resolve(dataDir, `q${fileName}`)
-    );
-  }
+	for (const fileName of extractedIniFiles) {
+		fs.copyFileSync(
+			path.resolve(protoSlkDir, fileName),
+			path.resolve(dataDir, `q${fileName}`)
+		);
+	}
 
-  spawnSync(`python38`, [`data-slk2csv.py`], {cwd: __dirname, stdio: 'inherit'});
-  await JSONFromUnitFunc.run();
-  await JSONDataMerger.run();
+	spawnSync(`python38`, [`data-slk2csv.py`], {cwd: __dirname, stdio: 'inherit'});
+	await JSONFromUnitFunc.run();
+	await JSONDataMerger.run();
 }
 
 function stripProtoJass(jass) {
@@ -132,9 +132,9 @@ function stripProtoJass(jass) {
 }
 
 function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
-  console.log(`########################`);
-  console.log(`# Running codegen      #`);
-  console.log(`########################`);
+	console.log(`########################`);
+	console.log(`# Running codegen			#`);
+	console.log(`########################`);
 
 	const folderContents = new Set(fs.readdirSync(upstreamDir));
 	const protoInfo = parseWar(InfoLegacy, path.resolve(protoObjDir, 'war3map.w3i'))
@@ -282,23 +282,23 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 		let outJassString = protoJass;
 		outJassString = stripProtoJass(outJassString);
 		outJassString = lintJass(outJassString);
-    if (useMMD) {
-      outJassString = insertMMDDeps(outJassString);
-      outJassString = insertMMDLibrary(outJassString);
-    }
+		if (useMMD) {
+			outJassString = insertMMDDeps(outJassString);
+			outJassString = insertMMDLibrary(outJassString);
+		}
 		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts}, {
 			version: evergreenVersion,
 			author: evergreenAuthor,
 			date: evergreenDate,
-      language: `English`,
+			language: `English`,
 			generator: evergreenGenerator,
 			AMAIVersion: [AMAIVersion.brand, ...[AMAIVersion.public, AMAIVersion.private].map(coloredShortHash)].join(` .. `),
 		});
-    outJassString = mergeMaxPlayers(outJassString);
+		outJassString = mergeMaxPlayers(outJassString);
 		outJassString = mergeGlobals(outJassString, main, config);
-    if (useMMD) {
-      outJassString = insertMMDGlobals(outJassString, main, config);
-    }
+		if (useMMD) {
+			outJassString = insertMMDGlobals(outJassString, main, config);
+		}
 		outJassString = mergeInitialization(outJassString, main, config, functions, {dropItemsTriggers});
 		{
 			// W3 calls the config function to setup the match slots.
@@ -433,8 +433,8 @@ function optimizeMaps(useSlk, useZopfli) {
 			spawnSync(`MPQEditor`, [`extract`, fileName, `(listfile)`, ".", `/fp`], {cwd: backportsDir});
 		}
 		if (useSlk) {
-		  spawnSync('w2l.exe', ['slk', path.resolve(backportsDir, baseFileName)], {cwd: backportsDir, stdio: 'inherit'});
-		  fileName = `${fileName.slice(0, -4)}_slk.w3x`;
+			spawnSync('w2l.exe', ['slk', path.resolve(backportsDir, baseFileName)], {cwd: backportsDir, stdio: 'inherit'});
+			fileName = `${fileName.slice(0, -4)}_slk.w3x`;
 		}
 		if (useZopfli) {
 			const listFilePath = path.resolve(backportsDir, `${fileName}.list`);
@@ -447,7 +447,7 @@ function optimizeMaps(useSlk, useZopfli) {
 			resultOptimized.push(path.resolve(backportsDir, fileName));
 		}
 		if (fileName == baseFileName) {
-		  throw new Error(`Intermediate name was still the same as base name during optimization.`);
+			throw new Error(`Intermediate name was still the same as base name during optimization.`);
 		}
 		try {
 			fs.renameSync(
@@ -513,10 +513,10 @@ function updateMapHashes(wc3_data_path, sub_folder) {
 	}
 	const mapNames = fs.readdirSync(outFolder).filter(isMapFileName);
 	if (!mapNames.length) return console.error(`No maps generated at ${outFolder}.`);
-  let version;
+	let version;
 	const hashes = new Map();
 	for (const fileName of mapNames) {
-    version = /(\d+(?:[a-z]+)?)\.w3x$/.exec(fileName)[1];
+		version = /(\d+(?:[a-z]+)?)\.w3x$/.exec(fileName)[1];
 		hashes.set(fileName, getMapHash(path.resolve(outFolder, fileName)));
 	}
 	const hashList = Array.from(hashes).map(tuple => tuple.join(','));
@@ -529,11 +529,11 @@ async function runUpdate(opts) {
 	if (opts.deploy && !opts.adaptSeasonalMaps && !opts.useCachedBackports) {
 		throw new Error(`Either deploy from cache or from new adaption (deploy=true requires opts.useCachedBackports, or opts.adaptSeasonalMaps)`);
 	}
-  if (opts.optimize && !(opts.useSlk || opts.useZopfli)) {
-    throw new Error(`Optimization requested, but no optimization methods were enabled`);
-  }
+	if (opts.optimize && !(opts.useSlk || opts.useZopfli)) {
+		throw new Error(`Optimization requested, but no optimization methods were enabled`);
+	}
 
-  let resultOptimized = [];
+	let resultOptimized = [];
 	let hasCachedProto = qHasCachedProto();
 	if (opts.extractPrototype && !hasCachedProto) await extractProto();
 	if (opts.extractSeasonalMaps) {
@@ -621,7 +621,7 @@ async function runMain(mapSet, suffix = '') {
 		optimize: true, // true
 		useSlk: true, // true - // Requires w3x2lni in PATH
 		useZopfli: true, // false
-    useMMD: true, // Apparently, 1.26a crashes when MMD is used.
+		useMMD: true, // Apparently, 1.26a crashes when MMD is used.
 		deploy: true,
 		deployPath: {
 			prune: true,
@@ -632,64 +632,64 @@ async function runMain(mapSet, suffix = '') {
 }
 
 async function main() {
-  let t = process.hrtime();
+	let t = process.hrtime();
 
-  console.log(`########################`);
-  console.log(`# Evergreen generator  #`);
-  console.log(`########################`);
+	console.log(`########################`);
+	console.log(`# Evergreen generator	#`);
+	console.log(`########################`);
 
-  // NOTE: Builds are NOT reproducible.
+	// NOTE: Builds are NOT reproducible.
 
-  let testSuffix = ''; // '-Test'
-  let errors = [];
-  let optimized = [];
-  //*
-  try {
-    optimized.push(...await runMain(2, testSuffix)); // Testing maps
-  } catch (err) {
-    errors.push(err);
-    console.error(err.message);
-  }
-  //*/
-  /*
-  try {
-    optimized.push(...await runMain(1, testSuffix)); // Selection maps
-  } catch (err) {
-    errors.push(err);
-    console.error(err.message);
-  }
-  try {
-    optimized.push(...await runMain(0, testSuffix)); // Ladder maps
-  } catch (err) {
-    errors.push(err);
-    console.error(err.message);
-  }
-  //*/
-  try {
-    await runAttachCommander(testSuffix);
-  } catch (err) {
-    errors.push(err);
-    console.error(err.message);
-  }
-  t = process.hrtime(t);
+	let testSuffix = ''; // '-Test'
+	let errors = [];
+	let optimized = [];
+	//*
+	try {
+		optimized.push(...await runMain(2, testSuffix)); // Testing maps
+	} catch (err) {
+		errors.push(err);
+		console.error(err.message);
+	}
+	//*/
+	/*
+	try {
+		optimized.push(...await runMain(1, testSuffix)); // Selection maps
+	} catch (err) {
+		errors.push(err);
+		console.error(err.message);
+	}
+	try {
+		optimized.push(...await runMain(0, testSuffix)); // Ladder maps
+	} catch (err) {
+		errors.push(err);
+		console.error(err.message);
+	}
+	//*/
+	try {
+		await runAttachCommander(testSuffix);
+	} catch (err) {
+		errors.push(err);
+		console.error(err.message);
+	}
+	t = process.hrtime(t);
 
-  if (optimized.length) {
-    console.log(`########################`);
-    console.log(`# Fully optimized maps #`);
-    console.log(`########################`);
-    for (const elem of optimized) {
-      console.log(`- ${elem}`);
-    }
-    console.log(`Total: ${optimized.length} maps.`);
-  }
+	if (optimized.length) {
+		console.log(`########################`);
+		console.log(`# Fully optimized maps #`);
+		console.log(`########################`);
+		for (const elem of optimized) {
+			console.log(`- ${elem}`);
+		}
+		console.log(`Total: ${optimized.length} maps.`);
+	}
 
-  console.log(`Done in ${t[0]} seconds.`);
-  if (errors.length) {
-    console.error(`${errors.length} errors.`);
-    for (const error of errors) console.error(error);
-  }
+	console.log(`Done in ${t[0]} seconds.`);
+	if (errors.length) {
+		console.error(`${errors.length} errors.`);
+		for (const error of errors) console.error(error);
+	}
 
-  process.exit(); // anyKeyPress handler hangs Node.js
+	process.exit(); // anyKeyPress handler hangs Node.js
 }
 
 main();

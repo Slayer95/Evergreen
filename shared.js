@@ -25,8 +25,8 @@ function getProtoFilePath() {
 module.exports = {
 	protoDir,
 	protoObjDir,
-  protoSlkDir,
-  dataDir,
+	protoSlkDir,
+	dataDir,
 	customDir, // additional files for maps
 	upstreamDirs,
 	adaptedDirs,
