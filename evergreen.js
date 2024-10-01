@@ -516,7 +516,7 @@ function updateMapHashes(wc3_data_path, sub_folder) {
 	let version;
 	const hashes = new Map();
 	for (const fileName of mapNames) {
-		version = /(\d+(?:[a-z]+)?)\.w3x$/.exec(fileName)[1];
+		version = /(\d+(?:[a-z_]+)?)\.w3x$/.exec(fileName)[1];
 		hashes.set(fileName, getMapHash(path.resolve(outFolder, fileName)));
 	}
 	const hashList = Array.from(hashes).map(tuple => tuple.join(','));
