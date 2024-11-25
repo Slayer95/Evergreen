@@ -13,7 +13,6 @@ war3map.w3h
 war3map.w3q
 war3map.w3t
 war3map.w3u
-war3mapmisc.txt
 ability.ini
 destructable.ini
 doodad.ini

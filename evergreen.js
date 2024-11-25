@@ -291,6 +291,7 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 			author: evergreenAuthor,
 			date: evergreenDate,
 			language: `English`,
+			gameVersion: `2.0.0.22389`,
 			generator: evergreenGenerator,
 			AMAIVersion: [AMAIVersion.brand, ...[AMAIVersion.public, AMAIVersion.private].map(coloredShortHash)].join(` .. `),
 		});
@@ -434,7 +435,10 @@ function optimizeMaps(useSlk, useZopfli) {
 		}
 		if (useSlk) {
 			spawnSync('w2l.exe', ['slk', path.resolve(backportsDir, baseFileName)], {cwd: backportsDir, stdio: 'inherit'});
-			fileName = `${fileName.slice(0, -4)}_slk.w3x`;
+      fileName = `${fileName.slice(0, -4)}_slk.w3x`;
+      spawnSync(`MPQEditor`, [`extract`, fileName, `Units/UnitUI.slk`, ".", `/fp`, `/listfile`, `..\prototype\listfile-slk.txt`], {cwd: backportsDir});
+      spawnSync(`PopulateUnitSkins`, {cwd: path.resolve(backportsDir, `Units`)});
+      spawnSync(`MPQEditor`, [`add`, fileName, `Units/UnitSkin.txt`], {cwd: backportsDir});
 		}
 		if (useZopfli) {
 			const listFilePath = path.resolve(backportsDir, `${fileName}.list`);
@@ -442,7 +446,7 @@ function optimizeMaps(useSlk, useZopfli) {
 			fs.renameSync(path.resolve(backportsDir, `(listfile)`), listFilePath);
 			fs.appendFileSync(listFilePath, getSlkExtraListFiles());
 			const compressedFileName = `${baseFileName.slice(0, -4)}_min.w3x`;
-			spawnSync('compress-mpq.exe', [`-l`, listFilePathFromRelease, fileName, compressedFileName], {cwd: backportsDir, stdio: 'inherit'});
+			spawnSync('compress-mpq.exe', [`-c`, `-t`, `2`, `-l`, listFilePathFromRelease, fileName, compressedFileName], {cwd: backportsDir, stdio: 'inherit'});
 			fileName = compressedFileName;
 			resultOptimized.push(path.resolve(backportsDir, fileName));
 		}
@@ -643,7 +647,7 @@ async function main() {
 	let testSuffix = ''; // '-Test'
 	let errors = [];
 	let optimized = [];
-	//*
+	/*
 	try {
 		optimized.push(...await runMain(2, testSuffix)); // Testing maps
 	} catch (err) {
@@ -651,7 +655,7 @@ async function main() {
 		console.error(err.message);
 	}
 	//*/
-	/*
+	//*
 	try {
 		optimized.push(...await runMain(1, testSuffix)); // Selection maps
 	} catch (err) {

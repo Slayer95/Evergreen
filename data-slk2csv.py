@@ -12,6 +12,7 @@ def main():
             print("Parsing " + filename)
             with open("data/" + filename, 'r') as readstream:
                 slklines = readstream.readlines()
+                # SylkParser requires slk files to be preprocessed in order to be able to read them
                 with open("data/" + filename[0:-4] + ".slk2", 'w') as writestream:
                     for line in slklines:
                         line = re.sub(r"\\", r"\\\\", line)

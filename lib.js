@@ -447,9 +447,11 @@ function getAMAIVersion() {
 	}
 	const refToPublicCommit = localBranch.startsWith('2.6.x') ? `2.6.x-zh~3` : `official`;
 	const upstreamVersion = execSync(`git rev-parse ${refToPublicCommit}`, {cwd: amaiFolder}).toString('utf8').trim();
+	let versionFragment = localBranch.split('-', 1)[0];
+	if (versionFragment === '2.6.x') versionFragment = '2.6.2';
 	return {
 		branch: localBranch,
-		brand: localBranch.startsWith('2.6.x') ? '|cffffcc002.6.2|r' : '|cffffcc003.3.5a|r',
+		brand: `|cffffcc00${versionFragment}|r`,
 		private: localCommit,
 		public: upstreamVersion,
 	};

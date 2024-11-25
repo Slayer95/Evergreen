@@ -2,6 +2,8 @@
 Cursor=UI\Cursor\UndeadCursor.mdl
 
 [FrameDef]
+DISCONNECT = "No GProxy? Disconnect"
+GAMEOVER_DISCONNECTED = "Lost connection. Download GProxy?"
 QUESTSMAIN=About
 QUESTSOPTIONAL=Optional
 QUESTS=Info
