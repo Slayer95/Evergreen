@@ -215,7 +215,9 @@ function removeDeadCode(jassCode) {
 			continue;
 		}
 		let trimmed = inputLines[i].trim();
-		if (trimmed.startsWith(`if `)) {
+		/*if (trimmed.startsWith(`//`)) {
+			continue;
+		} else */if (trimmed.startsWith(`if `)) {
 			ifDepth++;
 		} else if (trimmed.startsWith(`endif`)) {
 			if (deadCodeDepth === ifDepth) {
@@ -243,7 +245,7 @@ function removeDeadCode(jassCode) {
 }
 
 function insertMMDDeps(jassCode) {
-	jassCode += (`
+	jassCode += removeDeadCode(`
 //Struct method generated initializers/callers:
 function sa__MMD__QueueNode_onDestroy takes nothing returns boolean
 local integer this=f__arg_this
@@ -268,7 +270,7 @@ endfunction
 
 function insertMMDLibrary(jassCode) {
 
-	let transpiledVJassCodeLibrary = (
+	let transpiledVJassCodeLibrary = removeDeadCode(
 `//Generated method caller for MMD__QueueNode.onDestroy
 function sc__MMD__QueueNode_onDestroy takes integer this returns nothing
             call FlushStoredInteger(MMD__gc, MMD__M_KEY_VAL + s__MMD__QueueNode_key[this], s__MMD__QueueNode_msg[this])
@@ -423,9 +425,12 @@ endfunction
         local integer r
         local integer array picks
         local boolean array pick_flags
+        local player p
         loop
             exitwhen i >= udg_RFMaxPlayerIndex
-            if GetPlayerController(Player(i)) == MAP_CONTROL_USER and GetPlayerSlotState(Player(i)) == PLAYER_SLOT_STATE_PLAYING then
+            set p = Player(i)
+            // If possible, do not let observers emit MMD data
+            if GetPlayerController(p) == MAP_CONTROL_USER and GetPlayerSlotState(p) == PLAYER_SLOT_STATE_PLAYING and (not IsPlayerObserver(p)) then
                 if n < MMD__num_senders then //initializing picks
                     set picks[n]=i
                     set pick_flags[i]=true
@@ -441,6 +446,32 @@ endfunction
             endif
             set i=i + 1
         endloop
+
+        if n == 0 then
+            // No actual player found. Then try to get MMD data from an observer.
+            // This is useful for replay analysis of AIs.
+            set i = 0
+            loop
+                exitwhen i >= udg_RFMaxPlayerIndex
+                set p = Player(i)
+                if GetPlayerController(p) == MAP_CONTROL_USER and GetPlayerSlotState(p) == PLAYER_SLOT_STATE_PLAYING then
+                    if n < MMD__num_senders then //initializing picks
+                        set picks[n]=i
+                        set pick_flags[i]=true
+                    else //maintain the invariant 'P(being picked) = c/n'
+                        set r=GetRandomInt(0, n)
+                        if r < MMD__num_senders then
+                            set pick_flags[picks[r]]=false
+                            set picks[r]=i
+                            set pick_flags[i]=true
+                        endif
+                    endif
+                    set n=n + 1
+                endif
+                set i=i + 1
+            endloop
+        endif
+
         return pick_flags[GetPlayerId(GetLocalPlayer())]
     endfunction
     
@@ -683,7 +714,7 @@ endfunction
     endfunction
 `);
 
-  let transpiledVJassCodeAPI = (
+  let transpiledVJassCodeAPI = removeDeadCode(
 `
     ///Sets a player flag like "win_on_leave"
     function MMD_FlagPlayer takes player p,integer flag_type returns nothing

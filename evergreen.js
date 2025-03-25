@@ -133,7 +133,7 @@ function stripProtoJass(jass) {
 
 function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 	console.log(`########################`);
-	console.log(`# Running codegen			#`);
+	console.log(`# Running codegen      #`);
 	console.log(`########################`);
 
 	const folderContents = new Set(fs.readdirSync(upstreamDir));
@@ -286,12 +286,11 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 			outJassString = insertMMDDeps(outJassString);
 			outJassString = insertMMDLibrary(outJassString);
 		}
-		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts}, {
+		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts, gameVersion: `2.0.2 PTR 1`}, {
 			version: evergreenVersion,
 			author: evergreenAuthor,
 			date: evergreenDate,
 			language: `English`,
-			gameVersion: `2.0.0.22389`,
 			generator: evergreenGenerator,
 			AMAIVersion: [AMAIVersion.brand, ...[AMAIVersion.public, AMAIVersion.private].map(coloredShortHash)].join(` .. `),
 		});
@@ -435,10 +434,10 @@ function optimizeMaps(useSlk, useZopfli) {
 		}
 		if (useSlk) {
 			spawnSync('w2l.exe', ['slk', path.resolve(backportsDir, baseFileName)], {cwd: backportsDir, stdio: 'inherit'});
-      fileName = `${fileName.slice(0, -4)}_slk.w3x`;
-      spawnSync(`MPQEditor`, [`extract`, fileName, `Units/UnitUI.slk`, ".", `/fp`, `/listfile`, `..\prototype\listfile-slk.txt`], {cwd: backportsDir});
-      spawnSync(`PopulateUnitSkins`, {cwd: path.resolve(backportsDir, `Units`)});
-      spawnSync(`MPQEditor`, [`add`, fileName, `Units/UnitSkin.txt`], {cwd: backportsDir});
+			fileName = `${fileName.slice(0, -4)}_slk.w3x`;
+			spawnSync(`MPQEditor`, [`extract`, fileName, `Units/UnitUI.slk`, ".", `/fp`, `/listfile`, `..\prototype\listfile-slk.txt`], {cwd: backportsDir});
+			spawnSync(`PopulateUnitSkins`, {cwd: path.resolve(backportsDir, `Units`)});
+			spawnSync(`MPQEditor`, [`add`, fileName, `Units/UnitSkin.txt`], {cwd: backportsDir});
 		}
 		if (useZopfli) {
 			const listFilePath = path.resolve(backportsDir, `${fileName}.list`);
