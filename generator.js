@@ -14,6 +14,8 @@ const invalidPatterns = [
 	/GetConvertedPlayerId\(([a-zA-Z0-9_ \(\)]+)\) \+ 1/g,
 ];
 
+const endglobalsToken = '\nendglobals';
+
 const contradictoryConditions = new Set([
 	`if false then`,
 	`if true == false then`,
@@ -128,12 +130,24 @@ function insertInSection(source, header, functions) {
 	functions = functions.filter(x => x);
 	if (!functions.length) return source;
 	let headerIndex = source.indexOf(`//*  ${header}`);
-	let nlIndex1 = source.indexOf(`\n`, headerIndex);
-	let nlIndex2 = source.indexOf(`\n`, nlIndex1 + 1);
-	let nlIndex3 = source.indexOf(`\n`, nlIndex2 + 1);
+	let insertPos = -1;
+	if (headerIndex >= 0) {
+		let nlIndex1 = source.indexOf(`\n`, headerIndex);
+		let nlIndex2 = source.indexOf(`\n`, nlIndex1 + 1);
+		let nlIndex3 = source.indexOf(`\n`, nlIndex2 + 1);
+		insertPos = nlIndex3;
+	} else {
+		let initGlobalsStartStr = `function InitGlobals takes nothing returns nothing`;
+		let tmpIndex1 = source.indexOf(initGlobalsStartStr);
+		let tmpIndex2 = source.indexOf('endfunction', tmpIndex1 + initGlobalsStartStr.length);
+		let tmpIndex3 = source.indexOf('\n', tmpIndex2 + 11);
+		let tmpIndex4 = source.indexOf('\n', tmpIndex3 + 1);
+		insertPos = tmpIndex4;
+	}
+	
 	let fnSources = functions.map(fn => fn.hasOwnProperty(LUA_SOURCE) ? lua2jass(fn, fn[LUA_SOURCE]) : downgradeJass(fn.source));
 	fnSources.push('');
-	return source.slice(0, nlIndex3 + 1) + `\r\n` + fnSources.join(`\r\n`) + source.slice(nlIndex3 + 1);
+	return source.slice(0, insertPos + 1) + `\r\n` + fnSources.join(`\r\n`) + source.slice(insertPos + 1);
 }
 
 function insertMeta(jassCode, meleeMeta, evergreenMeta) {
@@ -868,13 +882,16 @@ ${match}
 	return jassCode;
 }
 
-function mergeMain(mergedCode, main) {
+function mergeMain(mergedCode, main, functions) {
 	mergedCode = mergedCode.replace(/call SetCameraBounds([^\r\n]+?)(?=\r?\n)/, `call SetCameraBounds(${main.camera.join(', ')})`);
 	mergedCode = mergedCode.replace(/call SetDayNightModels([^\r\n]+?)(?=\r?\n)/, `call SetDayNightModels(${main.dayNightModels.join(', ')})`);
 	mergedCode = mergedCode.replace(/call SetAmbientDaySound\([^\)]+\)/, `call SetAmbientDaySound(${main.daySound})`);
 	mergedCode = mergedCode.replace(/call SetAmbientNightSound\([^\)]+\)/, `call SetAmbientNightSound(${main.nightSound})`);
-	if (main.regions.length) {
+	if (main.regions.size) {
 		mergedCode = mergedCode.replace(/(\s*)call CreateAllUnits/, `$1call CreateRegions(  )\r\n$1call CreateAllUnits`);
+	}
+	if (functions.InitRandomGroups) {
+		mergedCode = mergedCode.replace(/(\s*)call CreateAllUnits/, `$1call InitRandomGroups(  )\r\n$1call CreateAllUnits`);
 	}
 	return mergedCode;
 }
@@ -903,11 +920,16 @@ function mergeMaxPlayers(mergedCode) {
 }
 
 function mergeGlobals(mergedCode, main, config) {
-	if (!main.regions.length) return mergedCode;
-	let index = mergedCode.indexOf('endglobals');
+	if (!main.regions.size && !main.randomUnitGroups.size) return mergedCode;
+	let index = mergedCode.indexOf(endglobalsToken);
 	for (let regionName of main.regions) {
 		let addedString = ' '.repeat(4) + 'rect                    ' + regionName + '            = null\r\n';
-		mergedCode = mergedCode.slice(0, index) + addedString + mergedCode.slice(index);
+		mergedCode = mergedCode.slice(0, index + 1) + addedString + mergedCode.slice(index + 1);
+		index += addedString.length;
+	}
+	for (let randomUnitGroup of main.randomUnitGroups) {
+		let addedString = ' '.repeat(4) + 'integer array           ' + randomUnitGroup + '\r\n';
+		mergedCode = mergedCode.slice(0, index + 1) + addedString + mergedCode.slice(index + 1);
 		index += addedString.length;
 	}
 	return mergedCode;
@@ -999,6 +1021,10 @@ integer f__arg_this
 
 function mergeInitialization(mergedCode, main, config, functions, {dropItemsTriggers}) {
 
+	mergedCode = insertInSection(mergedCode, 'Random Groups', [
+		functions.InitRandomGroups,
+	]);
+
 	//***************************************************************************
 	//*
 	//*  Unit Item Tables
@@ -1070,7 +1096,7 @@ function mergeInitialization(mergedCode, main, config, functions, {dropItemsTrig
     //call SetDayNightModels( "Environment\\DNC\\DNCLordaeron\\DNCLordaeronTerrain\\DNCLordaeronTerrain.mdl", "Environment\\DNC\\DNCLordaeron\\DNCLordaeronUnit\\DNCLordaeronUnit.mdl" )
     //call SetAmbientDaySound( "LordaeronSummerDay" )
     //call SetAmbientNightSound( "LordaeronSummerNight" )
-	mergedCode = mergeMain(mergedCode, main);
+	mergedCode = mergeMain(mergedCode, main, functions);
 
 	//***************************************************************************
 	//*

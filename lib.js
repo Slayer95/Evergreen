@@ -62,11 +62,14 @@ const replacements = {
 		// 'WD00':
 	},
 	Units: {
+		// I don't think this change is needed anymore (data/Units.txt must list them).
 		__proto__: null,
+		/*
 		'nech': 'ndog', // Chicken -> Dog
 		'necr': 'npig', // Rabbit -> Pig
 		'nfro': 'ncrb', // Frog -> Crab
 		'nrac': 'nder', // Racoon -> Deer
+		*/
 	},
 };
 
@@ -204,7 +207,10 @@ function logOnce(str) {
 
 function dooValidator(fn, arg, invalidTypes) {
 	let logger = function (type, item) {
-		let result = fn(type, item.type);
+		if (type === 'doodad' && /^d[\da-f]+[\da-f][\da-f]$/i.test(item.type)) {
+			return true;
+		}
+		let result = fn(type, item.type) || fn(type, item.type.toLowerCase());
 		if (!result) {
 			const alternatives = type === 'doodad' ? Array.from(DataExists.Doodads).filter(x => x[1] === item.type[1] && x[3] === item.type[3]).join(', ') : ``;
 			logOnce(`Invalid .doo entry: ${type}:${item.type}. Suggestions: ${alternatives || 'None'}.`);
@@ -277,6 +283,10 @@ function copyFileSync(from, to) {
 	return fs.writeFileSync(to, fs.readFileSync(from));
 }
 
+function getFoldersFromMapNames(rootPath) {
+	return fs.readdirSync(rootPath).filter(isMapFileName).map(mapFile => path.resolve(rootPath, mapFile.slice(0, -4)));
+}
+
 function batchExtract(rootPath) {
 	//console.log(`[batchExtract] ${rootPath}`);
 	const mapFiles = fs.readdirSync(rootPath).filter(isMapFileName);
@@ -303,6 +313,7 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 		const doodadsPath = path.resolve(rootPath, outFolder, 'war3map.doo');
 		const unitsPath = path.resolve(rootPath, outFolder, 'war3mapUnits.doo');
 		let doodads;
+		let doodadsRewritten = false;
 		try {
 			/*if (mapFile === '(4)dejavu_s2_v1.5.w3x') throw new Error(`Deja Vu bad locale.`);*/
 			doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
@@ -315,6 +326,7 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			doodads = parseWar(mode === 'legacy' ? DoodadsLatest : DoodadsLegacy, fbPath);
 		}
 		let units;
+		let unitsRewritten = false;
 		try {
 			units = parseWar(mode === 'legacy' ? UnitsLegacy : UnitsLatest, unitsPath);
 		} catch (err) {
@@ -330,12 +342,20 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			if (doodad.type in replacements.Doodads) {
 				doodad.type = replacements.Doodads[doodad.type];
 				doodad.skinId = doodad.type;
+				doodadsRewritten = true;
+				console.log(`[${mapFile}] (${mode}) units rewritten because of bad doodad types`);
 			}
 		}
 		for (const unit of units) {
-			if (unit.player > 23) unit.player -= 12;
+			if (unit.player > 23) {
+				unit.player -= 12;
+				unitsRewritten = true;
+				console.log(`[${mapFile}] (${mode}) units rewritten because of bad player number`);
+			}
 			if (unit.type in replacements.Units) {
 				unit.type = replacements.Units[unit.type];
+				unitsRewritten = true;
+				console.log(`[${mapFile}] (${mode}) units rewritten because of bad unit types`);
 			}
 		}
 
@@ -345,14 +365,99 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 		const validUnits = units.filter(dooValidator(exists, 'unit', invalidUnitTypes));
 		if (validDoodads.length !== doodads.length) {
 			console.log(`${doodads.length - validDoodads.length} doodads(${Array.from(invalidDoodadTypes).sort()}) deleted from ${mapFile}`);
+			doodadsRewritten = true;
 		}
 		if (validUnits.length !== units.length) {
-			console.log(`${units.length - validUnits.length} units(${Array.from(invalidUnitTypes).sort()})	deleted from ${mapFile}`);
+			console.log(`${units.length - validUnits.length} units(${Array.from(invalidUnitTypes).sort()}) deleted from ${mapFile}`);
+			unitsRewritten = true;
 		}
 		const outDoodadsPath = path.resolve(rewriteFolder, outFolder, 'war3map.doo');
 		const outUnitsPath = path.resolve(rewriteFolder, outFolder, 'war3mapUnits.doo');
-		writeWar(outDoodadsPath, DoodadsLegacy, validDoodads);
-		writeWar(outUnitsPath, UnitsLegacy, validUnits);
+		if (doodadsRewritten || mode !== 'legacy') {
+			writeWar(outDoodadsPath, DoodadsLegacy, validDoodads);
+		} else {
+			fs.copyFileSync(doodadsPath, outDoodadsPath);
+			console.log(`[${mapFile}] (${mode}) war3map.doo copied without changes`);
+		}
+		if (unitsRewritten || mode !== 'legacy') {
+			writeWar(outUnitsPath, UnitsLegacy, validUnits);
+		} else {
+			fs.copyFileSync(unitsPath, outUnitsPath);
+			console.log(`[${mapFile}] (${mode}) war3mapUnits.doo copied without changes`);
+		}
+	}
+}
+
+function batchFixAutoAdapted(rootPath) {
+	const subFolders = getFoldersFromMapNames(rootPath);
+	for (const folder of subFolders) {
+		const doodadsPath = path.resolve(folder, 'war3map.doo');
+		const unitsPath = path.resolve(folder, 'war3mapUnits.doo');
+		fs.copyFileSync(doodadsPath, `${doodadsPath}.0`);
+		fs.copyFileSync(unitsPath, `${unitsPath}.0`);
+
+		let doodads;
+		let doodadsRewritten = false;
+		try {
+			doodads = parseWar(DoodadsLegacy, doodadsPath);
+		} catch (err) {
+			console.error(`File does not meet ${mode} spec: ${doodadsPath}`);
+			throw err;
+		}
+		let units;
+		let unitsRewritten = false;
+		try {
+			units = parseWar(UnitsLegacy, unitsPath);
+		} catch (err) {
+			console.error(`File does not meet ${mode} spec: ${unitsPath}`);
+			throw err;
+		}
+
+		for (const doodad of doodads) {
+			if (doodad.type in replacements.Doodads) {
+				doodad.type = replacements.Doodads[doodad.type];
+				doodad.skinId = doodad.type;
+				doodadsRewritten = true;
+				console.log(`[${folder}] units rewritten because of bad doodad types`);
+			}
+		}
+		for (const unit of units) {
+			if (unit.player > 23) {
+				unit.player -= 12;
+				unitsRewritten = true;
+				console.log(`[${folder}] units rewritten because of bad player number`);
+			}
+			if (unit.type in replacements.Units) {
+				unit.type = replacements.Units[unit.type];
+				unitsRewritten = true;
+				console.log(`[${folder}] units rewritten because of bad unit types`);
+			}
+		}
+
+		const invalidDoodadTypes = new Set();
+		const invalidUnitTypes = new Set();
+		const validDoodads = doodads.filter(dooValidator(exists, 'doodad', invalidDoodadTypes));
+		const validUnits = units.filter(dooValidator(exists, 'unit', invalidUnitTypes));
+		if (validDoodads.length !== doodads.length) {
+			console.log(`${doodads.length - validDoodads.length} doodads(${Array.from(invalidDoodadTypes).sort()}) deleted from ${folder}`);
+			doodadsRewritten = true;
+		}
+		if (validUnits.length !== units.length) {
+			console.log(`${units.length - validUnits.length} units(${Array.from(invalidUnitTypes).sort()}) deleted from ${folder}`);
+			unitsRewritten = true;
+		}
+		const outDoodadsPath = doodadsPath;
+		const outUnitsPath = unitsPath;
+		if (doodadsRewritten) {
+			writeWar(outDoodadsPath, DoodadsLegacy, validDoodads);
+		} else {
+			console.log(`[${folder}] war3map.doo no changes required`);
+		}
+		if (unitsRewritten) {
+			writeWar(outUnitsPath, UnitsLegacy, validUnits);
+		} else {
+			console.log(`[${folder}] war3mapUnits.doo no changes required`);
+		}
 	}
 }
 
@@ -363,8 +468,13 @@ function getMapInfo(folder, allowFallback = true) {
 	} catch (err) {
 		if (!allowFallback) throw err;
 		console.error(`File does not meet latest spec: ${path.resolve(folder, 'war3map.w3i')}`);
-		mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
-		console.error('Fallback OK (w3i)');
+		try {
+			mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
+			console.error('Fallback OK (w3i)');
+		} catch (err2) {
+			console.error('Fallback ERR (w3i)');
+			throw err2;
+		}
 	}
 	return mapInfo;
 }
@@ -527,7 +637,7 @@ module.exports = {
 	deepClone,
 	logOnce,
 	parseWar, writeWar, isMapFileName,
-	batchExtract, batchAdapt,
+	batchExtract, batchAdapt, batchFixAutoAdapted,
 	getMapInfo, getMapDescStrings,
 	getDate, getAMAIVersion,
 	getSlkExtraListFiles,
@@ -535,7 +645,7 @@ module.exports = {
 	getMapHash, qHasCachedProto, cacheProtoHash,
 
 	exists, replacements, tryReplaceUnit,
-	copyFileSync,
+	copyFileSync, getFoldersFromMapNames,
 
 	anyKeyPress,
 };

@@ -28,7 +28,7 @@ const jassparse = {
 					currentFn = null;
 				}
 			} else {
-				const declarationMatch = inputLines[i].match(/^function (Unit\d+_DropItems|ItemTable\d+_DropItems|CreateNeutralHostile|CreateNeutralPassiveBuildings|CreateNeutralPassive|CreatePlayerBuildings|CreatePlayerUnits|CreateAllUnits|CreateRegions|InitCustomPlayerSlots|InitCustomTeams|InitAllyPriorities) takes nothing returns nothing$/);
+				const declarationMatch = inputLines[i].match(/^function (Unit\d+_DropItems|ItemTable\d+_DropItems|CreateNeutralHostile|CreateNeutralPassiveBuildings|CreateNeutralPassive|CreatePlayerBuildings|CreatePlayerUnits|CreateAllUnits|CreateRegions|InitCustomPlayerSlots|InitCustomTeams|InitAllyPriorities|InitRandomGroups) takes nothing returns nothing$/);
 				if (declarationMatch) {
 					currentFn = {
 						name: declarationMatch[1],
@@ -55,6 +55,19 @@ const jassparse = {
 								init: [callExpressionNode],
 							});
 						}
+					}
+				}
+				
+				const fixedMatch = inputLines[i].match(/^\s*set ([a-zA-Z0-9_]+)(\[\d+\]|)\s*?=\s*('[\da-zA-Z][\da-zA-Z][\da-zA-Z][\da-zA-Z]'|\d+)/);
+				if (fixedMatch) {
+					const assignmentStatementNode = {
+						// TODO: Check spec
+						type: 'AssignmentStatement',
+						variables: [{name: fixedMatch[1], index: fixedMatch[2]}],
+						init: []
+					};
+					if (options.onCreateNode) {
+						options.onCreateNode(assignmentStatementNode);
 					}
 				}
 			}
@@ -131,10 +144,13 @@ function onCreateNode(sourceCode, functions, main, config, node) {
 			if (node.init[i] && node.init[i].type === 'CallExpression' && node.init[i].base.type === 'Identifier') {
 				switch (node.init[i].base.name) {
 				case 'Rect':
-					main.regions.push(node.variables[i].name);
+					main.regions.add(node.variables[i].name);
 					break;
 				}
 			}
+		}
+		if (node.variables[0].name.startsWith('gg_rg_')) {
+			main.randomUnitGroups.add(node.variables[0].name);
 		}
 	}
 }
@@ -164,7 +180,8 @@ function parseCode(source, language) {
 		dayNightModels: [],
 		daySound: '',
 		nightSound: '',
-		regions: [],
+		regions: new Set(),
+		randomUnitGroups: new Set(),
 	};
 	const config = {
 		playerCount: 2,

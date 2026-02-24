@@ -56,7 +56,7 @@ async function run() {
 		for (const fileName of processes[outName]) {
 			const tree = ini.parse(fs.readFileSync(path.resolve(dataDir, `${fileName}.txt`), 'utf8'));
 			for (const unitId in tree) {
-			output.set(unitId, tree[unitId]);
+				output.set(unitId, tree[unitId]);
 			}
 		}
 		fs.writeFileSync(path.resolve(dataDir, `${outName}.json`), JSON.stringify(Array.from(output)));

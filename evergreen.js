@@ -14,7 +14,7 @@ const {
 	delFolders,
 	logOnce,
 	parseWar, writeWar, isMapFileName,
-	batchExtract, batchAdapt,
+	batchExtract, batchAdapt, batchFixAutoAdapted,
 	getMapInfo, getMapDescStrings,
 	brandMap, coloredShortHash,
 	getDate,
@@ -121,7 +121,7 @@ function stripProtoJass(jass) {
 			if (inputLines[i] === 'endfunction') omitDeclaration = false;
 			continue;
 		}
-		const match = inputLines[i].match(/^function (Unit\d+_DropItems|ItemTable\d+_DropItems|CreateNeutralHostile|CreateNeutralPassiveBuildings|CreateNeutralPassive|CreatePlayerBuildings|CreatePlayerUnits|CreateAllUnits|CreateRegions|InitCustomPlayerSlots|InitCustomTeams|InitAllyPriorities) takes nothing returns nothing$/);
+		const match = inputLines[i].match(/^function (Unit\d+_DropItems|ItemTable\d+_DropItems|CreateNeutralHostile|CreateNeutralPassiveBuildings|CreateNeutralPassive|CreatePlayerBuildings|CreatePlayerUnits|CreateAllUnits|CreateRegions|InitCustomPlayerSlots|InitCustomTeams|InitAllyPriorities|InitRandomGroups) takes nothing returns nothing$/);
 		if (match) {
 			omitDeclaration = true;
 		} else {
@@ -273,6 +273,8 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 			}
 		}
 		mapInfo.globalWeather = upstreamMapInfo.globalWeather;
+		mapInfo.randomUnits = upstreamMapInfo.randomUnits;
+		mapInfo.randomItems = upstreamMapInfo.randomItems;
 		const outInfoPath = path.resolve(portFolder, 'war3map.w3i');
 		writeWar(outInfoPath, InfoLegacy, mapInfo, buffer => buffer[0x81] = 2); // Game Data Set = 2 (Latest Patch)
 
@@ -286,7 +288,7 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 			outJassString = insertMMDDeps(outJassString);
 			outJassString = insertMMDLibrary(outJassString);
 		}
-		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts, gameVersion: `2.0.2 PTR 1`}, {
+		outJassString = insertMeta(outJassString, {hash, editorVersion: mapInfo.editorVersion, texts: mapMetaTexts, gameVersion: `2.0.4`}, {
 			version: evergreenVersion,
 			author: evergreenAuthor,
 			date: evergreenDate,
@@ -348,7 +350,7 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromUpstream, fileName], {cwd: path.resolve(upstreamDir, folder)});
 		}
 		const asIsCustomFiles = [
-			`war3mapSkin.txt`,
+			`war3mapSkin.txt`, `Scripts\\common.j`, `Scripts\\blizzard.j`,
 		];
 		for (const fileName of asIsCustomFiles) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromCustom, fileName], {cwd: customDir});
@@ -385,7 +387,7 @@ function installAMAIInPlace(dirPath) {
 	const mapNames = fs.readdirSync(dirPath).filter(isMapFileName);
 	for (const fileName of mapNames) {
 		const pathFromCwd = path.relative(process.cwd(), path.resolve(dirPath, fileName));
-		spawnSync(`InstallTFTToMap.bat`, [pathFromCwd], {stdio: 'inherit'});
+		spawnSync(`InstallVERToMap.bat`, ['OPTTFT', pathFromCwd], {stdio: 'inherit'});
 	}
 }
 
@@ -543,6 +545,7 @@ async function runUpdate(opts) {
 		// TODO: This extraction can be cached, but gotta ensure that no new maps have been added.
 		batchExtract(adaptedDir);
 		batchExtract(upstreamDir);
+		//batchFixAutoAdapted(adaptedDir);
 	}
 
 	let useReleased = opts.useCachedBackports && hasCachedProto;
@@ -606,7 +609,7 @@ async function runDeploy(mapSet, suffix = '') {
 		optimize: false, // false
 		deploy: true,
 		deployPath: {
-			prune: true,
+			prune: false,
 			root: path.resolve(__dirname, '..', '..', '..', 'Games', 'WC3'),
 			subFolder: `Evergreen${suffix}`,
 		},
@@ -621,7 +624,7 @@ async function runMain(mapSet, suffix = '') {
 		adaptSeasonalMaps: true, /* ignored if cached */
 		useCachedBackports: false, // false
 		installAI: true, // true
-		optimize: true, // true
+		optimize: false, // true
 		useSlk: true, // true - // Requires w3x2lni in PATH
 		useZopfli: true, // false
 		useMMD: true, // Apparently, 1.26a crashes when MMD is used.
@@ -641,39 +644,46 @@ async function main() {
 	console.log(`# Evergreen generator	#`);
 	console.log(`########################`);
 
-	// NOTE: Builds are NOT reproducible.
+  // node evergreen-es && cd .. && cd AMAI && git checkout 3.4.2-evergreen-37d && rm checksum.txt && cd .. && cd evergreen && node evergreen
+  fs.copyFileSync(
+    'D:\\Games-Addons\\Warcraft\\w3x2lni_zh_v2.7.3\\config-en.ini',
+    'D:\\Games-Addons\\Warcraft\\w3x2lni_zh_v2.7.3\\config.ini',
+  );
 
 	let testSuffix = ''; // '-Test'
 	let errors = [];
 	let optimized = [];
-	/*
+	//*
 	try {
-		optimized.push(...await runMain(2, testSuffix)); // Testing maps
+		optimized.push(...await runMain(2, testSuffix)); // Testing maps // -t
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
 	}
 	//*/
-	//*
+	/*
 	try {
-		optimized.push(...await runMain(1, testSuffix)); // Selection maps
+		optimized.push(...await runMain(1, testSuffix)); // Selection maps // -x
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
 	}
+	//*/
+	/*/
 	try {
 		optimized.push(...await runMain(0, testSuffix)); // Ladder maps
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
 	}
-	//*/
+	/*/
 	try {
 		await runAttachCommander(testSuffix);
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
 	}
+	//*/
 	t = process.hrtime(t);
 
 	if (optimized.length) {
