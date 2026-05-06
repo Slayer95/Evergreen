@@ -252,6 +252,7 @@ function parseWar(handler, path) {
 		throw new Error(`Error parsing ${path}`, {cause: err});
 	}
 	if (handler === DoodadsLatest && result.json.special) {
+    // Support WC3MapTranslator v5.0.0
 		if (!result.json.special) return result.json.regular;
 		return result.json.regular.concat(result.json.special);
 	}
