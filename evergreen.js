@@ -344,7 +344,9 @@ function mergeUpstreamIntoCopies(willConvertSlk, useMMD) {
 			throw new Error(`Place Map Adapter v1.1.6 output at ${adaptedDir} (missing for ${folder}.w3x)`);
 		}
 		const asIsUpstreamFiles = [
-			//`war3map.shd`, `war3map.wpm`, `war3map.w3e`,
+			// Possibly related to bridges and other addons
+			`war3map.shd`, `war3map.wpm`, `war3map.w3e`,
+			`war3map.w3d`, /* support custom doodads */ `war3mapExtra.txt`, /* support custom idk */
 		];
 		for (const fileName of asIsUpstreamFiles) {
 			spawnSync(`MPQEditor`, [`add`, portedMapPathFromUpstream, fileName], {cwd: path.resolve(upstreamDir, folder)});

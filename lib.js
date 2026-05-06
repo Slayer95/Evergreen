@@ -251,7 +251,10 @@ function parseWar(handler, path) {
 	} catch (err) {
 		throw new Error(`Error parsing ${path}`, {cause: err});
 	}
-	if (result.errors.length) throw new AggregateError(result.errors);
+	if (handler === DoodadsLatest && result.json.special) {
+		if (!result.json.special) return result.json.regular;
+		return result.json.regular.concat(result.json.special);
+	}
 	return result.json;
 }
 
@@ -263,7 +266,6 @@ function writeWar(targetPath, handler, data, modFn) {
 	} catch (err) {
 		throw new Error(`Internal error writing ${targetPath}`, {cause: err});
 	}
-	if (result.errors.length) throw new AggregateError(result.errors);
 	if (modFn) modFn(result.buffer);
 	try {
 		fs.writeFileSync(targetPath, result.buffer);
