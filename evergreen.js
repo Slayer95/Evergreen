@@ -412,7 +412,7 @@ function installAMAICommander(wc3_data_path, sub_folder_base, sub_folder_cmdr) {
 		} while (tmpNames.has(tmpName));
 		tmpNames.add(tmpName);
 		copyFileSync(path.resolve(fromFolder, fileName), path.resolve(outFolder, tmpName));
-		spawnSync(`InstallCommanderToMap.bat`, [`TFT`, tmpName], {/*stdio: 'inherit', */cwd: outFolder});
+		spawnSync(`InstallCommanderToMap.bat`, [`TFT`, tmpName], {/*stdio: 'inherit', */cwd: outFolder, shell: true});
 		fs.renameSync(path.resolve(outFolder, tmpName), path.resolve(outFolder, fileName));
 	}
 }

@@ -73,6 +73,16 @@ const replacements = {
 	},
 };
 
+const RewriteReasons = {
+  Doodads: {
+    kAutoReplaceWidgetType: 1 << 1,
+  },
+  Units: {
+    kBadPlayerNumber: 1 << 0,
+    kAutoReplaceWidgetType: 1 << 1,
+  },
+};
+
 function float(num) {
 	if (num !== Math.floor(num)) return `${num}`;
 	return `${num}.0`;
@@ -316,7 +326,7 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 		const doodadsPath = path.resolve(rootPath, outFolder, 'war3map.doo');
 		const unitsPath = path.resolve(rootPath, outFolder, 'war3mapUnits.doo');
 		let doodads;
-		let doodadsRewritten = false;
+		let doodadsRewritten = 0;
 		try {
 			/*if (mapFile === '(4)dejavu_s2_v1.5.w3x') throw new Error(`Deja Vu bad locale.`);*/
 			doodads = parseWar(mode === 'legacy' ? DoodadsLegacy : DoodadsLatest, doodadsPath);
@@ -329,7 +339,7 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			doodads = parseWar(mode === 'legacy' ? DoodadsLatest : DoodadsLegacy, fbPath);
 		}
 		let units;
-		let unitsRewritten = false;
+		let unitsRewritten = 0;
 		try {
 			units = parseWar(mode === 'legacy' ? UnitsLegacy : UnitsLatest, unitsPath);
 		} catch (err) {
@@ -345,22 +355,32 @@ function batchAdapt(rootPath, mode = 'latest', rewriteFolder, allowFallback = tr
 			if (doodad.type in replacements.Doodads) {
 				doodad.type = replacements.Doodads[doodad.type];
 				doodad.skinId = doodad.type;
-				doodadsRewritten = true;
-				console.log(`[${mapFile}] (${mode}) units rewritten because of bad doodad types`);
+				doodadsRewritten |= RewriteReasons.Doodads.kAutoReplaceWidgetType;
 			}
 		}
+
+    if (doodadsRewritten & RewriteReasons.Doodads.kAutoReplaceWidgetType) {
+      console.log(`[${mapFile}] (${mode}) doodads rewritten because of bad doodad types`);
+    }
+
 		for (const unit of units) {
 			if (unit.player > 23) {
 				unit.player -= 12;
-				unitsRewritten = true;
-				console.log(`[${mapFile}] (${mode}) units rewritten because of bad player number`);
+				unitsRewritten |= RewriteReasons.Doodads.kBadPlayerNumber;
 			}
 			if (unit.type in replacements.Units) {
 				unit.type = replacements.Units[unit.type];
-				unitsRewritten = true;
-				console.log(`[${mapFile}] (${mode}) units rewritten because of bad unit types`);
+				unitsRewritten |= RewriteReasons.Doodads.kAutoReplaceWidgetType;
 			}
 		}
+
+    if (unitsRewritten & RewriteReasons.Units.kBadPlayerNumber) {
+      console.log(`[${mapFile}] (${mode}) units rewritten because of bad player number`);
+    }
+
+    if (unitsRewritten & RewriteReasons.Units.kAutoReplaceWidgetType) {
+      console.log(`[${mapFile}] (${mode}) units rewritten because of bad unit types`);
+    }
 
 		const invalidDoodadTypes = new Set();
 		const invalidUnitTypes = new Set();
@@ -464,18 +484,24 @@ function batchFixAutoAdapted(rootPath) {
 	}
 }
 
+function readVersionFromMapInfo(mapInfoPath) {
+  return fs.readFileSync(mapInfoPath)[0];
+}
+
 function getMapInfo(folder, allowFallback = true) {
-	let mapInfo;
+	let mapInfoPath = path.resolve(folder, 'war3map.w3i');
+  let mapInfo;
 	try {
-		mapInfo = parseWar(InfoLatest, path.resolve(folder, 'war3map.w3i'));
+		mapInfo = parseWar(InfoLatest, mapInfoPath);
 	} catch (err) {
 		if (!allowFallback) throw err;
-		console.error(`File does not meet latest spec: ${path.resolve(folder, 'war3map.w3i')}`);
+		console.error(`File (V${readVersionFromMapInfo(mapInfoPath)}) does not meet latest spec: ${mapInfoPath}`);
 		try {
-			mapInfo = parseWar(InfoLegacy, path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i'));
+      mapInfoPath = path.resolve(getAltSourceFolder(path.dirname(folder)), path.basename(folder), 'war3map.w3i');
+			mapInfo = parseWar(InfoLegacy, mapInfoPath);
 			console.error('Fallback OK (w3i)');
 		} catch (err2) {
-			console.error('Fallback ERR (w3i)');
+			console.error(`Fallback ERR (w3i) (found V${readVersionFromMapInfo(mapInfoPath)})`);
 			throw err2;
 		}
 	}
@@ -553,9 +579,9 @@ function getAMAIVersion() {
 	const localBranch = execSync(`git rev-parse --abbrev-ref head`, {cwd: amaiFolder}).toString('utf8').trim();
 	const localCommit = execSync(`git rev-parse head`, {cwd: amaiFolder}).toString('utf8').trim();
 	if (localCommit !== getChecksum(amaiFolder)) {
-		const amaiResult = spawnSync(`MakeTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
+		const amaiResult = spawnSync(`MakeTFT.bat`, {stdio: 'inherit', cwd: amaiFolder, shell: true});
 		assert.strictEqual(localCommit, getChecksum(amaiFolder));
-		spawnSync(`MakeOptTFT.bat`, {stdio: 'inherit', cwd: amaiFolder});
+		spawnSync(`MakeOptTFT.bat`, {stdio: 'inherit', cwd: amaiFolder, shell: true});
 		assert.strictEqual(localCommit, getChecksum(amaiFolder));
 	}
 	const refToPublicCommit = localBranch.startsWith('2.6.x') ? `2.6.x-zh~3` : `official`;
