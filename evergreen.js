@@ -389,7 +389,7 @@ function installAMAIInPlace(dirPath) {
 	const mapNames = fs.readdirSync(dirPath).filter(isMapFileName);
 	for (const fileName of mapNames) {
 		const pathFromCwd = path.relative(process.cwd(), path.resolve(dirPath, fileName));
-		spawnSync(`InstallVERToMap.bat`, ['OPTTFT', pathFromCwd], {stdio: 'inherit'});
+		spawnSync(`InstallVERToMap.bat`, ['OPTTFT', pathFromCwd], {stdio: 'inherit', shell: true});
 	}
 }
 
@@ -626,7 +626,7 @@ async function runMain(mapSet, suffix = '') {
 		adaptSeasonalMaps: true, /* ignored if cached */
 		useCachedBackports: false, // false
 		installAI: true, // true
-		optimize: false, // true
+		optimize: true, // true
 		useSlk: true, // true - // Requires w3x2lni in PATH
 		useZopfli: true, // false
 		useMMD: true, // Apparently, 1.26a crashes when MMD is used.
@@ -652,35 +652,35 @@ async function main() {
     'D:\\Games-Addons\\Warcraft\\w3x2lni_zh_v2.7.3\\config.ini',
   );
 
-	let testSuffix = ''; // '-Test'
+	let mapCategorySuffix = ''; // '-Test'
 	let errors = [];
 	let optimized = [];
-	//*
-	try {
-		optimized.push(...await runMain(2, testSuffix)); // Testing maps // -t
-	} catch (err) {
-		errors.push(err);
-		console.error(err.message);
-	}
-	//*/
 	/*
 	try {
-		optimized.push(...await runMain(1, testSuffix)); // Selection maps // -x
+		optimized.push(...await runMain(2, mapCategorySuffix)); // Testing maps // -t
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
 	}
 	//*/
-	/*/
+	//*
 	try {
-		optimized.push(...await runMain(0, testSuffix)); // Ladder maps
+		optimized.push(...await runMain(1, mapCategorySuffix)); // Selection maps // -x
+	} catch (err) {
+		errors.push(err);
+		console.error(err.message);
+	}
+	//*/
+	//*/
+	try {
+		optimized.push(...await runMain(0, mapCategorySuffix)); // Ladder maps
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
 	}
 	/*/
 	try {
-		await runAttachCommander(testSuffix);
+		await runAttachCommander(mapCategorySuffix);
 	} catch (err) {
 		errors.push(err);
 		console.error(err.message);
